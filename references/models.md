@@ -19,7 +19,7 @@ If you cannot verify and the prompt does not actually depend on the exact ID or 
 
 ## Anthropic / Claude
 
-`last-verified: 2026-06-24` · source: `claude-api` skill
+`last-verified: 2026-08-19` · source: `claude-api` skill, cross-checked against anthropic.com release announcements
 
 | Model | ID | Context | Max output | Input $/MTok | Output $/MTok |
 |---|---|---|---|---|---|
@@ -30,6 +30,10 @@ If you cannot verify and the prompt does not actually depend on the exact ID or 
 | Claude Sonnet 5 | `claude-sonnet-5` | 1M | 128K | $3 | $15 |
 | Claude Sonnet 4.6 | `claude-sonnet-4-6` | 1M | 128K | $3 | $15 |
 | Claude Haiku 4.5 | `claude-haiku-4-5` | 200K | 64K | $1 | $5 |
+
+Release order: Sonnet 5 on 2026-06-30, Opus 5 on 2026-07-24. Claude Mythos 5 exists but is restricted to an approved-access programme — do not route to it unless the user says they are in that programme.
+
+**Sonnet 5 is on introductory pricing of $2/$10 per MTok through 2026-08-31.** After that it reverts to the $3/$15 in the table. If a cost estimate is part of the prompt, say which of the two you used.
 
 Use the exact ID strings. Do not append date suffixes.
 
@@ -56,47 +60,66 @@ Use the exact ID strings. Do not append date suffixes.
 
 ## OpenAI
 
-`UNVERIFIED` · carried from upstream PR #62 (GPT-5.6 Sol / Terra / Luna routing)
+`last-verified: 2026-08-19` · source: web (openai.com announcements, simonwillison.net launch coverage)
 
-- Family: **Sol** (flagship), **Terra** (balanced), **Luna** (fast, high-volume). Availability in the ChatGPT product depends on the user's plan.
-- Reasoning effort is set per request; use the lowest level that meets the quality bar.
+GPT-5.6 shipped 2026-07-09 in three tiers.
+
+| Tier | Positioning | Input $/MTok | Output $/MTok |
+|---|---|---|---|
+| Sol | Flagship | $5 | $30 |
+| Terra | Balanced everyday work | $2.50 | $15 |
+| Luna | Fast, high-volume, cost-sensitive | $1 | $6 |
+
+All three: 1M context, 128K max output, knowledge cutoff 2026-02-16.
+
+- Reasoning effort spans `none`, `low`, `medium`, `high`, `xhigh`, `max`. **`max` effort and ultra mode are Sol-only.** Use the lowest level that meets the quality bar.
+- **The API slugs are not formally documented.** `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` appear in launch coverage and example code but not in a published model table. Verify against the API before writing a slug into a prompt; route by tier name if you cannot.
+- An Ultrafast mode for Sol (up to ~750 tokens/sec) was formalised 2026-08-13 as an API-only preview for selected customers. Do not assume the user has it.
 - Product controls (Pro, Max, Ultra) are ChatGPT and Codex surface features, not API parameters. Do not translate one into the other.
-- Verify exact model slugs before writing them into a prompt. If you cannot, route by family name and say the slug is unverified.
 
 ---
 
 ## Google / Gemini
 
-`UNVERIFIED` · Gemini 3.x family
+`last-verified: 2026-08-19` · source: web (ai.google.dev model list, Google blog, TechCrunch)
 
-- Tiers: Pro for hard reasoning and long documents, Flash for volume and latency.
-- 1M context on current Pro tiers. Native multimodal input including video and PDF.
-- `thinking_level` sets reasoning depth. `media_resolution` trades fine-detail reading against token cost.
-- Gemini Omni is the any-input-to-video family; individual clips cap at roughly 10 seconds.
-- Verify the current slug (`gemini-3.1-pro`, `gemini-3.5-flash`, `gemini-omni-flash`, and successors) before writing it into a prompt.
+- **Pro tier: Gemini 3.1 Pro** (`gemini-3.1-pro-preview`). **Gemini 3.5 Pro has not shipped** — it was promised and delayed. Do not route to it.
+- **Flash tier: Gemini 3.7 Flash** (`gemini-3.7-flash`), released 2026-08-13, currently the most capable workhorse. `gemini-3.6-flash` and `gemini-3.5-flash` remain available; `gemini-flash-latest` points at the GA Flash.
+- The Flash line moves fast — three releases in roughly a month. Check the current slug rather than assuming.
+- 1M context on Pro tiers. Native multimodal input: text, image, audio, video, PDF.
+- `thinking_level` sets reasoning depth; `media_resolution` trades fine-detail reading against token cost. Both are carried from earlier documentation and were not re-confirmed in the current model list — verify before writing either into a setup note.
+
+**Gemini Omni Flash** (`gemini-omni-flash`), released 2026-06-30, is the any-input-to-video model: text, images, audio, and reference video into one conversational session, with plain-language editing across turns. Priced per second of output video (about $0.10/sec at launch).
+
+**The per-clip duration cap is not publicly documented.** A widely repeated figure of roughly 10 seconds circulates but does not appear in Google's own materials. Do not state a number as fact. Decompose long requests into a numbered clip sequence regardless — that is sound for continuity whatever the real cap turns out to be — and tell the user to confirm the limit for their surface.
 
 ---
 
 ## xAI / Grok
 
-`UNVERIFIED` · carried from upstream PR #62 (Grok 4.6 routing)
+`last-verified: 2026-08-19` · source: web (docs.x.ai, AWS Bedrock model card, launch coverage)
 
-- `grok-4.6` for chat, coding, agentic, and knowledge work. Text and image input.
-- OpenAI-API compatible. Reasoning effort: `low`, `medium`, `high` (API default), `xhigh`. Reasoning cannot be disabled.
+- **`grok-4.6`**, released 2026-08-12. Built for coding, agentic work, and long-running agents.
+- **500K context.** Text and image input, text-only output.
+- Reasoning effort: `low`, `medium`, `high` (default), `xhigh`. `xhigh` is new in 4.6.
+- Pricing is tiered on prompt size: $2/$0.50/$6 per MTok (input / cached input / output) below 200K prompt tokens, $4/$1/$12 above it. A prompt that crosses 200K doubles its own rate — worth flagging when the prompt ships a large context.
+- OpenAI-API compatible. Supports function calling, web search, X search, and code execution.
 - No realtime knowledge without Web Search or X Search enabled.
 - Prompt caching keys: `prompt_cache_key` on the Responses API, `x-grok-conv-id` on Chat Completions.
-- Grok Imagine is the image and short-video surface; it is a separate product from the API.
+- Grok Imagine is the image and short-video surface, a separate product from the API.
 
 ---
 
 ## MiniMax
 
-`UNVERIFIED` · carried from upstream v1.7.0
+`last-verified: 2026-08-19` · source: web (minimax.io research blog, platform.minimax.io docs, OpenRouter)
 
-- M3 is the current default; M2.7 carries a 1M context window.
-- OpenAI-compatible API. Temperature must be in the range 0 to 1 inclusive; above 1 fails.
+- **MiniMax M3**, released 2026-06-01. Open-weight mixture of experts, 428B total parameters with about 23B active per token.
+- **1M context, 262K max output.** Native multimodal input: text, image, and video, passed as `image_url` and `video_url` content parts.
+- OpenAI-compatible Chat Completions — an existing OpenAI setup needs only a base URL and key change.
+- **Recommended sampling is `temperature=1.0`, `top_p=0.95`.** Earlier MiniMax generations required temperature at or below 1 and this file previously carried that as a hard rule; it is no longer the right guidance for M3. Do not write a temperature clamp into an M3 prompt.
+- Strong on long-horizon agentic work, coding, and tool use.
 - May emit reasoning in `<think>` tags.
-- Function calling uses OpenAI-style tool definitions.
 
 ---
 

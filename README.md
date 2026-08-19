@@ -229,7 +229,7 @@ Prompt Master includes specific profiles for 30+ tools. For anything not on the 
 | **Qwen 2.5 / Qwen3** | Open-weight LLM | Chat template format, thinking vs non-thinking mode detection |
 | **Local models (Llama, Mistral)** | Open-weight LLM | Shorter prompts, simpler structure, no complex nesting |
 | **DeepSeek-R1** | Reasoning LLM | Short clean instructions, strips CoT, suppresses thinking output if needed |
-| **MiniMax (M3 / M2.7)** | Reasoning LLM | Temperature clamping, thinking tag control, structured output optimization |
+| **MiniMax (M3)** | Reasoning LLM | Multimodal input parts, thinking tag control, structured output optimization |
 | **Claude Code** | Agentic AI | Stop conditions, file scope, checkpoint output, disjoint parallel-agent scope |
 | **Cortex Code** | Agentic AI | Snowflake-native tooling, tracked steps, warehouse-spend stop conditions |
 | **Cursor / Windsurf** | IDE AI | File path, function name, do-not-touch list, sequential prompt guidance |
@@ -258,7 +258,7 @@ Prompt Master includes specific profiles for 30+ tools. For anything not on the 
 | **Unity AI** | 3D / Game AI | Game genre, platform target, mechanic description over code |
 | **Sora / Runway** | Video AI | Camera movement, duration, cut style |
 | **LTX / Dream Machine / Kling** | Video AI | Cinematic language, motion intensity, style reference |
-| **Gemini Omni** | Video AI | 10s clip decomposition, verbatim continuity header, multi-turn deltas |
+| **Gemini Omni** | Video AI | Multi-clip decomposition, verbatim continuity header, multi-turn deltas |
 | **ElevenLabs** | Voice AI | Emotion, pacing, emphasis, speech rate |
 | **Zapier / Make / n8n** | Workflow automation | Trigger app + event, action app + field mapping |
 
@@ -420,6 +420,7 @@ This is the single biggest fix for long sessions. Most wasted re-prompts come fr
 
 ## ℹ️ Version History
 
+- **1.10.0** — Verified the model facts against vendor sources instead of carrying them on trust. Five vendor sections in `references/models.md` moved from UNVERIFIED to dated, and three were materially wrong: MiniMax M3 recommends temperature 1.0 while the file carried a hard "must be at or below 1" clamp from an earlier generation, Gemini's Pro and Flash tiers had both moved (and the promised 3.5 Pro never shipped), and the Gemini Omni 10-second clip cap turned out to be undocumented folklore rather than a published limit. DeepSeek, Qwen, Meta, and Ollama stay marked UNVERIFIED rather than being dressed up as checked.
 - **1.9.4** — Three things this README advertised that the skill did not implement. The Safe Techniques section promised five and SKILL.md defined four: XML structural tags were used by the Claude profile and Template F but never listed as a technique, so they are now one. The **Universal Fingerprint** was named here and existed nowhere — the unknown-tool rule now asks its four questions (input format, system/user separation, dominant failure mode, memory) and each answer changes how the prompt is built. The tool table listed an "OpenAI Computer Use" profile that does not exist; the profile covers OpenAI Atlas, and the row now says what Atlas actually needs.
 - **1.9.3** — Template L declared four Decompiler tasks but shipped output formats for three; Simplify had none and silently fell back to the Break-down shape. Added a Simplify format that forces the pass to account for every removal and to name anything load-bearing it deliberately kept, since over-trimming is how a simplify pass fails.
 - **1.9.2** — Second rule-without-a-home fix, found the same way as 1.9.1. Input sanitization and credential/sensitive-data redaction had no slot in Template L, so a Decompiler run could strip a leaked API key or a live customer record and never tell the user. Template L now runs an explicit safety pass and carries a Safety notes line in every output format, omitted when nothing fired.

@@ -56,16 +56,17 @@ Do not assume one universal Claude default. When unsure, start with **Claude Opu
 - Keep system prompts under 200 words — longer prompts hurt performance on reasoning models
 
 ## Grok / Grok 4.6 / xAI
-- Use `grok-4.6` for current general chat, coding, agentic, and knowledge-work prompts. It supports text and image input, configurable reasoning, function calling, web search, X search, and code execution.
+- Use `grok-4.6` for current general chat, coding, agentic, and knowledge-work prompts. 500K context, text and image input, text-only output, plus configurable reasoning, function calling, web search, X search, and code execution.
 - Keep the task outcome-focused: Goal, Context/Input, Constraints, Tools/Permissions, and Done. Grok 4.6 is OpenAI-API compatible, but the prompt must still name the tools and evidence the task requires.
 - Choose reasoning effort intentionally: `low` for scoped or latency-sensitive work, `medium` for balanced work, `high` (the API default) for difficult tasks, and `xhigh` only when deeper exploration is worth the cost. Grok 4.6 reasoning cannot be disabled. Do not ask for chain-of-thought.
 - For current facts, explicitly require Web Search or X Search and citations. Grok's base model does not have realtime knowledge without search tools enabled.
 - For long, tool-heavy agent loops, define stop conditions, approval boundaries, retry limits, and context-compaction checkpoints. Keep stable instructions at the front to preserve prompt-cache reuse.
+- Pricing is tiered on prompt size and doubles above 200K prompt tokens. Flag that when a prompt ships a large context.
 - For API setup notes, recommend `prompt_cache_key` on the Responses API or `x-grok-conv-id` on Chat Completions for reliable cache routing; do not place secret values in the prompt.
 - Consumer Grok and the xAI API expose different controls. If the user is in grok.com or X and cannot set model parameters, encode only behavioral requirements in the prompt rather than API settings.
 
-## Gemini 3.x (Gemini 3 Pro / 3.1 Pro / Flash, AI Studio, Gemini API, Gemini app)
-- Confirm the tier before writing: Pro for hard reasoning and long documents, Flash for high-volume or latency-sensitive work. The app, AI Studio, and the API expose different controls — do not encode API parameters in a prompt destined for the consumer app.
+## Gemini 3.x (Gemini 3.1 Pro / 3.7 Flash, AI Studio, Gemini API, Gemini app)
+- Confirm the tier before writing: Pro for hard reasoning and long documents, Flash for high-volume or latency-sensitive work. Current Pro is Gemini 3.1 Pro; current Flash is Gemini 3.7 Flash. Gemini 3.5 Pro was announced and has not shipped — do not route to it. The app, AI Studio, and the API expose different controls — do not encode API parameters in a prompt destined for the consumer app.
 - Very large context (1M on current Pro tiers) and native multimodal input (text, image, audio, video, PDF) — put source documents first, the question last, and wrap each document plus its metadata in a descriptive tag.
 - Reasoning depth is set by a `thinking_level` style control, not by prompt scaffolding. Raise the level for hard tasks instead of adding "think step by step".
 - `media_resolution` trades fine-detail reading against token cost — mention it in a setup note when the task depends on reading small text in an image or PDF.
@@ -111,11 +112,11 @@ Do not assume one universal Claude default. When unsure, start with **Claude Opu
 - Short clean instructions only — state the goal and desired output format
 - Outputs reasoning in `<think>` tags by default — add "Output only the final answer, no reasoning." if needed
 
-## MiniMax (M3 / M2.7)
+## MiniMax (M3)
 - OpenAI-compatible API — prompts that work with GPT models transfer directly
-- Strong at instruction following, structured output, and long-context synthesis — 1M context window on M2.7
-- M2.7-highspeed is optimized for speed — use for latency-sensitive tasks
-- Temperature must be between 0 and 1 (inclusive) — prompts that set temperature above 1 will fail
+- Strong at instruction following, structured output, and long-context synthesis — 1M context and 262K max output on M3
+- M3 accepts image and video input alongside text, passed as OpenAI-style `image_url` and `video_url` content parts
+- Do not clamp temperature. M3 recommends temperature 1.0 with top_p 0.95; the old "at or below 1" rule came from earlier generations and no longer applies
 - May output reasoning in `<think>` tags — add "Output only the final answer, no reasoning tags." if the user does not want visible thinking
 - Good at code generation, JSON output, and multi-step analysis — leverage these strengths
 - Responds well to explicit role assignment and structured prompts with clear output format specifications
@@ -151,7 +152,7 @@ Do not assume one universal Claude default. When unsure, start with **Claude Opu
 - Keep one primary agent responsible for synthesis. Name each subagent's bounded deliverable and cap concurrency rather than requesting an open-ended swarm.
 - Ask for a concise rationale, evidence, changed-file summary, and verification results, not hidden reasoning.
 
-## Antigravity (Google's agent-first IDE, powered by Gemini 3 Pro)
+## Antigravity (Google's agent-first IDE, powered by Gemini Pro-tier models)
 - Task-based prompting — describe outcomes, not steps
 - Prompt for an Artifact (task list, implementation plan) before execution so you can review it first
 - Browser automation is built-in — include verification steps: "After building, verify UI at 375px and 1440px using the browser agent"
@@ -259,7 +260,7 @@ Read [templates.md](templates.md) Template K for the full ComfyUI template.
 
 ## Gemini Omni — Video (Google's any-input-to-video family, e.g. `gemini-omni-flash`)
 - Any-input pipeline: text, images, audio, and reference video all go into one conversational session. Say which inputs the user will attach and what each one is for ("image 1 = the character, video 1 = the camera move to match").
-- Clips cap at roughly 10 seconds each. If the user asks for longer, do not write one long prompt — decompose into a numbered sequence of clips at or under the cap and output them as Clip 1, Clip 2, ... in one block.
+- Individual clips are short and the exact cap is not publicly documented. Do not quote a number as fact. For anything beyond a single short shot, decompose into a numbered sequence of clips and output them as Clip 1, Clip 2, ... in one block — that is the right structure whatever the real cap is — and tell the user to confirm the limit for their surface.
 - For multi-clip sequences, repeat a fixed continuity header verbatim in every clip prompt: subject description, wardrobe, location, lighting, lens, colour grade, and time of day. Only the action and camera line changes between clips. Drifting descriptions are the main cause of characters changing between clips.
 - End each clip on a state the next clip can open from, and state that carry-over explicitly ("ends with the door half open; next clip opens on the same door").
 - Editing is multi-turn. After the first generation, prompt deltas ("same shot, slower dolly, keep everything else") rather than resubmitting the full description.
