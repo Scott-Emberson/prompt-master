@@ -9,6 +9,7 @@
   "homepage": "https://github.com/nidhinjs/prompt-master",
   "repository": "https://github.com/nidhinjs/prompt-master",
   "license": "MIT",
+  "skills": ["."],
   "keywords": [
     "prompt-engineering",
     "prompts",

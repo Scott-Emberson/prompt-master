@@ -1,7 +1,7 @@
 ---
 name: prompt-master
-version: 1.8.0
-description: Generates optimized prompts for AI tools. Activates only when the user explicitly asks to write, fix, improve, or adapt a prompt for a specific AI tool (LLM, Cursor, Midjourney, image AI, video AI, coding agents, etc.). Does not activate for general conversation, coding tasks, document writing, or other non-prompt-engineering work.
+version: 1.9.0
+description: "Generates optimized prompts for AI tools. Activates only when the user explicitly asks to write, fix, improve, or adapt a prompt for a specific AI tool (LLM, Cursor, Midjourney, image AI, video AI, coding agents, etc.). Does not activate for general conversation, coding tasks, document writing, or other non-prompt-engineering work."
 ---
 
 ## PRIMACY ZONE — Identity, Hard Rules, Output Lock
@@ -58,6 +58,8 @@ Before writing any prompt, silently extract these 9 dimensions. Missing critical
 | **Audience** | Who reads the output, their technical level | If user-facing |
 | **Success criteria** | How to know the prompt worked — binary where possible | If task is complex |
 | **Examples** | Desired input/output pairs for pattern lock | If format-critical |
+
+**Precedence:** the 3-question limit always wins over completeness of extraction. If critical dimensions are still unknown after 3 questions, build the best prompt possible and state the assumptions inline: "I assumed [X] — tell me if that is wrong."
 
 ---
 
@@ -140,11 +142,15 @@ Do not assume one universal Claude default. When unsure, start with **Claude Opu
 
 ---
 
-**Gemini 2.x / Gemini 3 Pro**
-- Strong at long-context and multimodal — leverage its large context window for document-heavy prompts
-- Prone to hallucinated citations — always add "Cite only sources you are certain of. If uncertain, say [uncertain]."
-- Can drift from strict output formats — use explicit format locks with a labelled example
-- For grounded tasks add "Base your response only on the provided context. Do not extrapolate."
+**Gemini 3.x** (Gemini 3 Pro / 3.1 Pro / Flash, AI Studio, Gemini API, Gemini app)
+- Confirm the tier before writing: Pro for hard reasoning and long documents, Flash for high-volume or latency-sensitive work. The app, AI Studio, and the API expose different controls — do not encode API parameters in a prompt destined for the consumer app.
+- Very large context (1M on current Pro tiers) and native multimodal input (text, image, audio, video, PDF) — put source documents first, the question last, and wrap each document plus its metadata in a descriptive tag.
+- Reasoning depth is set by a `thinking_level` style control, not by prompt scaffolding. Raise the level for hard tasks instead of adding "think step by step".
+- `media_resolution` trades fine-detail reading against token cost — mention it in a setup note when the task depends on reading small text in an image or PDF.
+- Gemini fills gaps by guessing. For grounded tasks add "Base your response only on the provided context. Do not extrapolate. If the information is missing, say so."
+- Still prone to fabricated citations — add "Cite only sources you are certain of. If uncertain, write [uncertain]."
+- Can drift from strict output formats — use an explicit format lock with one labelled example.
+- Tuned terse. Ask for the depth you want explicitly rather than assuming it will elaborate.
 
 ---
 
@@ -180,6 +186,16 @@ Do not assume one universal Claude default. When unsure, start with **Claude Opu
 
 ---
 
+**Meta AI** (meta.ai, WhatsApp / Instagram / Messenger assistant, Llama API)
+- Consumer Meta AI is a chat assistant with no system-prompt slot and no parameter controls. Put the role, constraints, and output contract inside the single user message.
+- Llama-family instruction following is weaker than Claude or GPT. Be more explicit: state the role, the exact output shape, the length, and what must not appear.
+- Keep structure flat. One task per prompt, short numbered constraints, no deep nesting — it drops nested requirements.
+- Sessions are short-memory and surface-dependent. Restate any context the prompt depends on instead of referring to earlier turns.
+- It reaches for web results and generates images inline. If you want text only, say "Do not generate an image. Text only." If you want sourced answers, say "Search the web and cite the sources you used."
+- For the Llama API or self-hosted Llama, use the open-weight LLM route above and set the role in the system prompt rather than the user turn.
+
+---
+
 **DeepSeek-R1**
 - Reasoning-native like o3 — do NOT add CoT instructions
 - Short clean instructions only — state the goal and desired output format
@@ -206,6 +222,7 @@ Do not assume one universal Claude default. When unsure, start with **Claude Opu
 - Do not assume the Claude Code model. Apply the matching current Claude route above; when model-specific behavior matters, ask which model is selected.
 - Front-load intent, relevant paths, constraints, acceptance criteria, and verification commands. Explicitly request tool use when inspection is required.
 - Current Fable/Opus models can over-scope and delegate readily. Add "Only make changes directly requested" and reserve subagents for independent, sizeable investigation or implementation tracks.
+- When a prompt splits work across parallel agents, give each agent a disjoint set of files and forbid writes outside it. Two agents editing the same file will conflict or silently overwrite each other. If the work cannot be partitioned by file, serialize it into numbered steps instead of parallelizing.
 - Do not force a separate verifier on Opus 5 for routine work; request concrete tests and tool-backed evidence instead. For long Fable 5 runs, require progress claims to cite actual tool results.
 - Always scope to specific files and directories — never give a global instruction without a path anchor
 - Human review triggers required: "Stop and ask before deleting any file, adding any dependency, or affecting the database schema"
@@ -213,12 +230,24 @@ Do not assume one universal Claude default. When unsure, start with **Claude Opu
 
 ---
 
+**Cortex Code (Snowflake's CLI coding agent)**
+- Agentic like Claude Code — runs tools, edits files, executes SQL, and manages Snowflake objects autonomously
+- Powered by current Claude models — apply the matching Claude route above, including the anti-over-scoping guard: "Only make changes directly requested."
+- Skills system: markdown system prompts loaded via `cortex skill add` — reference the skill's capabilities rather than re-explaining them in the prompt
+- Snowflake-native: prefer the `snowflake_sql_execute` tool for SQL and `st.connection("snowflake")` for Streamlit in Snowflake apps over raw connectors
+- Stop conditions and human review triggers are critical — same runaway-loop and credit-burn risk as Claude Code, plus live warehouse spend
+- For complex tasks use `cortex ctx task add` / `cortex ctx step add` to break work into tracked steps — the agent loses coherence on long unstructured tasks
+- Headless mode (`cortex -p "prompt" --output-format stream-json`) is available for CI and automation — output is JSON events, not plain text
+
+---
+
 **Codex CLI / ChatGPT Work / Codex IDE**
 - Use the GPT-5.6 route above. Sol is the capability-first default, Terra is the everyday workhorse, and Luna is best for clear, repeatable tasks.
 - Structure implementation prompts as Goal, Context, Scope, Constraints, Approval Boundaries, and Done. Include concrete verification commands when known.
+- Use Plan Mode when architecture, migrations, or several dependent steps need review before any edit lands. Let simple, bounded tasks execute directly.
 - Start with default reasoning. Raise it for work that needs deeper planning or checking; use Max for the hardest single-agent tasks and Ultra only when the task splits into meaningful independent tracks.
 - Keep one primary agent responsible for synthesis. Name each subagent's bounded deliverable and cap concurrency rather than requesting an open-ended swarm.
-- Ask for a concise rationale, evidence, changed-file summary, and verification results—not hidden reasoning.
+- Ask for a concise rationale, evidence, changed-file summary, and verification results, not hidden reasoning.
 
 ---
 
@@ -304,6 +333,8 @@ First detect: generation from scratch or editing an existing image?
 - **DALL-E 3**: Prose description works. Add "do not include text in the image unless specified." Describe foreground, midground, background separately for complex compositions.
 - **Stable Diffusion**: `(word:weight)` syntax. CFG 7-12. Negative prompt is MANDATORY. Steps 20-30 for drafts, 40-50 for finals.
 - **SeeDream**: Strong at artistic and stylized generation. Specify art style explicitly (anime, cinematic, painterly) before scene content. Mood and atmosphere descriptors work well. Negative prompt recommended.
+- **Nano Banana 2** (Google's Gemini-native image model, in the Gemini app, AI Studio, and the Gemini API): prose, not comma-salad. It is conversational — build the prompt as an instruction to an editor, then iterate with deltas rather than restating the whole scene. Strengths: legible in-image text, consistent characters across shots, and blending several reference images. Say exactly what text should appear and in what typeface style. When references are attached, name them ("use the jacket from image 2") instead of describing them. No `--flag` parameter syntax — express aspect ratio, style, and exclusions in words.
+- **Grok Imagine** (xAI, in grok.com and the X app): short, concrete, visual prompts. It generates stills and can animate a still into a short clip with audio, so state which you want up front. For the video step, describe one camera move and one subject action — it degrades when a clip is given a multi-shot script. No negative-prompt syntax; phrase exclusions positively ("empty street" beats "no people").
 
 ---
 
@@ -356,6 +387,17 @@ Read references/templates.md Template K for the full ComfyUI template.
 
 ---
 
+**Gemini Omni — Video** (Google's any-input-to-video family, e.g. `gemini-omni-flash`)
+- Any-input pipeline: text, images, audio, and reference video all go into one conversational session. Say which inputs the user will attach and what each one is for ("image 1 = the character, video 1 = the camera move to match").
+- Clips cap at roughly 10 seconds each. If the user asks for longer, do not write one long prompt — decompose into a numbered sequence of clips at or under the cap and output them as Clip 1, Clip 2, ... in one block.
+- For multi-clip sequences, repeat a fixed continuity header verbatim in every clip prompt: subject description, wardrobe, location, lighting, lens, colour grade, and time of day. Only the action and camera line changes between clips. Drifting descriptions are the main cause of characters changing between clips.
+- End each clip on a state the next clip can open from, and state that carry-over explicitly ("ends with the door half open; next clip opens on the same door").
+- Editing is multi-turn. After the first generation, prompt deltas ("same shot, slower dolly, keep everything else") rather than resubmitting the full description.
+- Specify audio intent explicitly — dialogue, ambient sound, or silent — since the model will invent a soundtrack otherwise.
+- Add a setup note telling the user to attach the reference media before pasting, and to run the clips in order in the same session so continuity holds.
+
+---
+
 **Voice AI** (ElevenLabs)
 - Specify emotion, pacing, emphasis markers, and speech rate directly
 - Use SSML-like markers for emphasis: indicate which words to stress, where to pause
@@ -370,9 +412,13 @@ Read references/templates.md Template K for the full ComfyUI template.
 
 ---
 
-### Credential Safety
+### Credential and Sensitive-Data Safety
 
 Generated prompts must never include API keys, tokens, secrets, connection strings, auth credentials, or env-var values. Use generic references like "assumes [service] is already authenticated" or "requires [ENV_VAR_NAME] to be set." If a user includes credentials, strip them and note: "Credentials removed. Set as environment variables instead of embedding in prompts."
+
+Sensitive input is a separate risk from credentials. If the user supplies confidential code, proprietary business logic, internal data, or personal data as context, do not reproduce it verbatim inside the generated prompt. Paraphrase the intent, replace real identifiers with placeholders, and keep only the minimum needed for the target tool to do the job. Flag it in one line when you do: "Redacted [X] from the prompt — replace with the real value locally before running."
+
+This matters most when the destination retains data: consumer or free-tier chat products, public image and video generators, and any shared workspace. Ask which surface the prompt is going to when the input is clearly sensitive and the destination is unknown.
 
 ---
 
@@ -439,6 +485,8 @@ Scan every user-provided prompt or rough idea for these failure patterns. Fix si
 - Silent agent → add "After each step output: ✅ [what was completed]"
 - Unrestricted filesystem → add scope lock on which files and directories are touchable
 - No human review trigger → add "Stop and ask before: [list destructive actions]"
+- Parallel agents pointed at the same file → repartition so each agent owns a disjoint file set, or serialize the steps
+- Sensitive input pasted verbatim into the prompt body → paraphrase it, placeholder the identifiers, and note the redaction
 
 ---
 
@@ -489,6 +537,13 @@ For prompts targeting agentic tools (Claude Code, Devin, Cursor, Windsurf, Cline
 4. Has every fabricated technique been removed?
 5. Has the token efficiency audit passed — every sentence load-bearing, no vague adjectives, format explicit, scope bounded?
 6. Would this prompt produce the right output on the first attempt?
+7. If the prompt splits work across parallel agents, does each agent own a disjoint set of files?
+
+**If any check fails:**
+- Fix it silently when the fix is clear and does not change the user's intent.
+- If the fix changes the user's intent, say so in one line: "I adjusted [X] to satisfy [constraint]. Tell me if that changes what you need."
+- If check 6 cannot be satisfied, do not ship it silently: "I am not confident this works first try — the uncertain part is [X]."
+- If check 7 fails, repartition the file ownership or serialize the steps before delivering.
 
 **Success criteria**
 The user pastes the prompt into their target tool. It works on the first try. Zero re-prompts needed. That is the only metric.
