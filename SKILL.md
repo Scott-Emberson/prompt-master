@@ -129,6 +129,7 @@ Routing rules that override the table:
 - **Image request:** decide generation-from-scratch versus editing-an-existing-image before picking a profile. Editing always uses the reference-editing profile regardless of which tool it is.
 - **Aggregator or gateway** (Atlas Cloud, OpenRouter, a hosting provider): the gateway changes access, not prompt dialect. Confirm the underlying model and use that model's profile.
 - **Agentic surface with an unspecified model** (Claude Code, Cline, Cortex Code): read the agent's profile *and* the profile for the underlying model.
+
 ---
 
 ### Credential and Sensitive-Data Safety
