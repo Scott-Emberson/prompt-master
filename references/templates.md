@@ -387,6 +387,22 @@ Key changes made:
 Safety notes: [what was ignored, stripped, or placeholdered, and why — one line each]
 ```
 
+**Simplify output format:**
+```
+Original prompt: [paste]
+
+Simplified:
+[tightened prompt]
+
+Cut, and why it was safe to cut:
+- [what was removed — restated default, duplicated instruction, filler, or scaffolding the target tool no longer needs]
+- [next removal and why]
+
+Kept deliberately: [anything that reads like padding but is load-bearing — domain context, a constraint with a real reason, a format lock — and why it stays]
+
+Safety notes: [what was ignored, stripped, or placeholdered, and why — one line each]
+```
+
 **Split output format:**
 ```
 Original prompt: [paste]
