@@ -1,6 +1,6 @@
 # Credit-Killing Patterns Reference
 
-37 patterns that waste tokens and cause re-prompts. Read this file when the user pastes a bad prompt and asks you to fix it, or when diagnosing why a prompt is underperforming.
+39 patterns that waste tokens and cause re-prompts. Read this file when the user pastes a bad prompt and asks you to fix it, or when diagnosing why a prompt is underperforming.
 
 ---
 
@@ -80,3 +80,5 @@
 | 35 | **No human review trigger** | Agent decides everything autonomously | "Stop and ask before: deleting any file, adding any dependency, or changing the database schema" |
 | 36 | **Vague first turn for an agentic model** | "fix the auth bug" with no scope, files, or criteria | Use Template M. Front-load the outcome, relevant context, file scope, constraints, action boundaries, and acceptance criteria. |
 | 37 | **Context rot on long sessions** | Repeats corrections while stale assumptions remain in context | Start a new session for unrelated work; otherwise compact around current decisions, constraints, failures, and target state. Delegate only independent, sizeable investigation. |
+| 38 | **Parallel agents on the same file** | Work split across 4 agents, all pointed at the same module | Give each agent a disjoint file set and forbid writes outside it. If the work cannot be partitioned by file, serialize it into numbered steps. |
+| 39 | **Sensitive input pasted verbatim** | Real credentials, customer records, or proprietary logic copied straight into the prompt body | Paraphrase the intent, replace identifiers with placeholders, and note the redaction. Ask which surface the prompt is going to when the destination retains data. |
