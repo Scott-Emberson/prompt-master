@@ -1,0 +1,141 @@
+{
+  "_about": [
+    "Rule-to-slot contracts, checked by tests/check-docs.mjs (check 11).",
+    "",
+    "A rule in SKILL.md is only real if the place it writes into still exists.",
+    "Each entry below names one rule and the slots it depends on. A slot is:",
+    "  file         repo-relative path, e.g. references/templates.md",
+    "  section      the heading or bold line that opens the block, e.g. '## Template M'.",
+    "               A prefix is enough: '## Template M' finds the full heading even if",
+    "               its subtitle changes. Bold-line sections work too, e.g.",
+    "               '**Adapt output format:**'.",
+    "  must_contain a literal string that has to appear inside that block",
+    "",
+    "The check asserts the section still exists AND still contains the string.",
+    "If either is gone, the rule has nowhere to land in the generated prompt, and",
+    "the failure message says so.",
+    "",
+    "Comment convention: any key starting with an underscore is ignored by the",
+    "checker, so you can leave notes anywhere. Use '_note' inside an entry.",
+    "",
+    "Two rules of thumb when adding an entry:",
+    "  1. Point slots at reference files, not at SKILL.md or README.md. Those two",
+    "     churn constantly and a contract pinned to their wording turns red for no",
+    "     real reason.",
+    "  2. Write 'consequence' in plain terms: what breaks in the user's prompt when",
+    "     this slot disappears. That sentence is what the failure prints."
+  ],
+  "contracts": [
+    {
+      "rule": "Parallel agents must own disjoint files (SKILL.md hard rule, diagnostic checklist, and pre-delivery verification)",
+      "_note": "Fixed by hand in 1.9.1. The rule told the skill to partition files and serialise shared work, but Template M had nowhere to put either.",
+      "consequence": "The skill is told to partition file ownership across parallel agents but the generated brief has no block to write the partition into, so the instruction is dropped and two agents get pointed at the same file.",
+      "slots": [
+        {
+          "file": "references/templates.md",
+          "section": "## Template M",
+          "must_contain": "## Execution Order"
+        },
+        {
+          "file": "references/tool-profiles.md",
+          "section": "## Claude Code",
+          "must_contain": "Execution Order"
+        }
+      ]
+    },
+    {
+      "rule": "Input sanitization and credential redaction must be recorded, not done silently (SKILL.md Credential Safety and Input Sanitization sections)",
+      "_note": "Fixed by hand in 1.9.2. Every Decompiler output format needs the Safety notes line, or a redaction happens with no way to tell the user.",
+      "consequence": "A Decompiler run can strip a leaked API key, a live customer record, or an embedded prompt injection and never tell the user it happened, because the output format it used has no line to record it in.",
+      "slots": [
+        {
+          "file": "references/templates.md",
+          "section": "**Break down output format:**",
+          "must_contain": "Safety notes:"
+        },
+        {
+          "file": "references/templates.md",
+          "section": "**Adapt output format:**",
+          "must_contain": "Safety notes:"
+        },
+        {
+          "file": "references/templates.md",
+          "section": "**Simplify output format:**",
+          "must_contain": "Safety notes:"
+        },
+        {
+          "file": "references/templates.md",
+          "section": "**Split output format:**",
+          "must_contain": "Safety notes:"
+        }
+      ]
+    },
+    {
+      "rule": "Template L declares four Decompiler tasks and must ship an output format for each",
+      "_note": "Fixed by hand in 1.9.3. Simplify had no format and silently fell back to the Break-down shape. Check 12 derives this pairing independently; these slots pin the four that exist today so a deletion is caught even if the task bullet is deleted alongside it.",
+      "consequence": "The task runs against another task's output shape, so the pass is never forced to produce what that task exists for. A Simplify with no Simplify format cannot be made to account for what it cut.",
+      "slots": [
+        {
+          "file": "references/templates.md",
+          "section": "## Template L",
+          "must_contain": "**Break down output format:**"
+        },
+        {
+          "file": "references/templates.md",
+          "section": "## Template L",
+          "must_contain": "**Adapt output format:**"
+        },
+        {
+          "file": "references/templates.md",
+          "section": "## Template L",
+          "must_contain": "**Simplify output format:**"
+        },
+        {
+          "file": "references/templates.md",
+          "section": "## Template L",
+          "must_contain": "**Split output format:**"
+        }
+      ]
+    },
+    {
+      "rule": "Model Recency Gate defers to the refresh protocol in models.md",
+      "_note": "SKILL.md tells the skill to honour that protocol and treat an expired section as a lead rather than a fact. If the protocol section loses its vocabulary the instruction points at nothing.",
+      "consequence": "The skill is told to check a section's verification date before stating a model fact, but the file no longer defines what a verification marker looks like, so every section reads as verified fact.",
+      "slots": [
+        {
+          "file": "references/models.md",
+          "section": "## Refresh Protocol",
+          "must_contain": "last-verified"
+        },
+        {
+          "file": "references/models.md",
+          "section": "## Refresh Protocol",
+          "must_contain": "UNVERIFIED"
+        }
+      ]
+    },
+    {
+      "rule": "Image editing always routes to the reference-editing profile, which must hand off to the editing template",
+      "_note": "SKILL.md's routing override says editing beats tool identity. The profile is the only place that names the template to use.",
+      "consequence": "An edit-an-existing-image request reaches the right profile and then stops, because the profile no longer says which template carries the reference-editing structure.",
+      "slots": [
+        {
+          "file": "references/tool-profiles.md",
+          "section": "## Image AI — Reference Editing",
+          "must_contain": "Template J"
+        }
+      ]
+    },
+    {
+      "rule": "ComfyUI routing hands off to the ComfyUI template",
+      "consequence": "A ComfyUI request loads the profile and gets prompting notes with no node-workflow structure, because the profile no longer names the template that carries it.",
+      "slots": [
+        {
+          "file": "references/tool-profiles.md",
+          "section": "## ComfyUI",
+          "must_contain": "Template K"
+        }
+      ]
+    }
+  ]
+}
