@@ -1,6 +1,6 @@
 ---
 name: prompt-master
-version: 1.9.3
+version: 1.9.4
 description: "Generates optimized prompts for AI tools. Activates only when the user explicitly asks to write, fix, improve, or adapt a prompt for a specific AI tool (LLM, Cursor, Midjourney, image AI, video AI, coding agents, etc.). Does not activate for general conversation, coding tasks, document writing, or other non-prompt-engineering work."
 ---
 
@@ -164,8 +164,16 @@ Read references/templates.md Template L for the full Prompt Decompiler template.
 ---
 
 **Unknown tool:**
-Identify the closest matching tool category from context. If genuinely unclear, ask: "Which tool is this for?" — then route accordingly. If not tool is found listed connect to the closest related tool.
-Then build using the closest matching category.
+Identify the closest matching tool category from context. If genuinely unclear, ask: "Which tool is this for?" — then route accordingly. If no tool in the Routing Index fits, fingerprint it before falling back to the closest related tool.
+
+**Universal Fingerprint** — four questions for a tool with no profile. Answer from the tool's own documentation or, where that is unavailable, from the user. Each answer changes what gets built:
+
+1. **What input does it accept — natural language, structured fields, code, or a node graph?** Prose for natural language, a labeled field block for structured input, a signature-and-behavior contract for code, one separate block per node for node-based tools.
+2. **Does it separate system instructions from user input, or is there one message only?** With a system slot, role and constraints go there and the user message carries only the task. Without one, fold role, constraints, and task into the first 30% of a single message.
+3. **What is its most common failure mode — excess output, wrong scope, hallucination, or autonomous drift?** Add the matching counter: an explicit length and format lock, a file or scope boundary, a grounding anchor, or stop conditions plus a human review trigger.
+4. **Does it carry memory across turns, or is it stateless per session?** Stateless tools need the Memory Block restated in every prompt and no reference to prior turns.
+
+Then build using the closest matching profile, adjusted by the four answers.
 
 ---
 
@@ -233,6 +241,8 @@ When the user's request references prior work, decisions, or session history —
 - Strong: "You are a senior backend engineer specializing in distributed systems who prioritizes correctness over cleverness"
 
 **Few-shot examples** — when format is easier to show than describe, provide 2 to 5 examples. Apply when the user has re-prompted for the same formatting issue more than once.
+
+**XML structural tags** — for Claude-based tools on complex mixed-content prompts, wrap each part in a descriptive tag: `<context>`, `<task>`, `<constraints>`, `<output_format>`, and `<examples>`/`<example>` around few-shot pairs. In long-context prompts, put source documents first inside their own tags. Skip it for short single-purpose prompts and for tools that do not parse XML reliably.
 
 **Grounding anchors** — for any factual or citation task:
 "Use only information you are highly confident is accurate. If uncertain, write [uncertain] next to the claim. Do not fabricate citations or statistics."

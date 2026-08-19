@@ -241,7 +241,7 @@ Prompt Master includes specific profiles for 30+ tools. For anything not on the 
 | **Google Stitch** | Full-stack generator | Interface goal over implementation, Material Design 3 spec |
 | **Devin / SWE-agent** | Autonomous agent | Starting state, target state, stop conditions |
 | **Manus** | Autonomous agent | Task outcome focus, permission scope, memory anchors |
-| **OpenAI Computer Use** | Computer-use agent | Screen state, allowed apps, stop before irreversible actions |
+| **OpenAI Atlas** | Computer-use agent | Outcome over navigation steps, permission boundaries, stop before irreversible actions |
 | **Perplexity Computer** | Computer-use agent | Artifact-first prompting, scoped permissions, verification steps |
 | **OpenClaw** | Computer-use agent | Conversational precision, persistent memory, security constraints |
 | **Perplexity / SearchGPT** | Search AI | Mode spec: search vs analyze vs compare |
@@ -420,6 +420,7 @@ This is the single biggest fix for long sessions. Most wasted re-prompts come fr
 
 ## ℹ️ Version History
 
+- **1.9.4** — Three things this README advertised that the skill did not implement. The Safe Techniques section promised five and SKILL.md defined four: XML structural tags were used by the Claude profile and Template F but never listed as a technique, so they are now one. The **Universal Fingerprint** was named here and existed nowhere — the unknown-tool rule now asks its four questions (input format, system/user separation, dominant failure mode, memory) and each answer changes how the prompt is built. The tool table listed an "OpenAI Computer Use" profile that does not exist; the profile covers OpenAI Atlas, and the row now says what Atlas actually needs.
 - **1.9.3** — Template L declared four Decompiler tasks but shipped output formats for three; Simplify had none and silently fell back to the Break-down shape. Added a Simplify format that forces the pass to account for every removal and to name anything load-bearing it deliberately kept, since over-trimming is how a simplify pass fails.
 - **1.9.2** — Second rule-without-a-home fix, found the same way as 1.9.1. Input sanitization and credential/sensitive-data redaction had no slot in Template L, so a Decompiler run could strip a leaked API key or a live customer record and never tell the user. Template L now runs an explicit safety pass and carries a Safety notes line in every output format, omitted when nothing fired.
 - **1.9.1** — Fixed a gap between the parallel-agent rule and Template M: the rule told the skill to partition files and serialize shared work, but the template had nowhere to put either. Added an Execution Order block (delete it for single-pass work) and cross-linked it from the Claude Code profile.
