@@ -1,6 +1,6 @@
 {
   "name": "prompt-master",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "Generates optimized, token-efficient prompts for any AI tool. Activates only when explicitly asked to write, fix, improve, or adapt a prompt for a specific AI tool.",
   "author": {
     "name": "nidhinjs",

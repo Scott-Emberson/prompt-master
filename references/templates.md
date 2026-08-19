@@ -394,7 +394,7 @@ Run these in order. Each output feeds the next.
 
 ## Template M — Current Claude Task Brief
 
-*Use for complex, multi-step, or agentic tasks on current Claude models—Claude.ai, API, or Claude Code. It front-loads the outcome, context, scope, and action boundaries while avoiding obsolete manual-thinking scaffolding.*
+*Use for complex, multi-step, or agentic tasks on current Claude models—Claude.ai, API, or Claude Code. It front-loads the outcome, context, scope, execution order, and action boundaries while avoiding obsolete manual-thinking scaffolding.*
 
 ```
 ## Objective
@@ -414,6 +414,15 @@ Run these in order. Each output feeds the next.
 - [Stack version, naming conventions, no new dependencies without asking]
 - Only make changes directly requested. Do not add features, abstractions, or files beyond what was asked.
 
+## Execution Order
+[Include when the work has dependent steps or is split across parallel agents. Delete when a single agent does one pass.]
+Sequential steps. Do not start a step until the previous one meets its check.
+
+**Step 1 — [what, and which files].** [One agent. Note here if later steps depend on it.]
+**Step 2 — [what].** [Parallel across N agents, or single, as appropriate.]
+- Each agent edits ONLY the files in its own group. List the groups explicitly before spawning.
+- No agent may edit a shared file, another group's files, or anything outside its group. If it needs a change outside its group, stop and report rather than edit.
+
 ## Acceptance Criteria
 - [ ] [Binary check 1]
 - [ ] [Binary check 2]
@@ -428,6 +437,8 @@ For long-running work, report progress only when it changes or when a checkpoint
 ```
 
 **Effort** — configure in the API or harness rather than requesting private reasoning in the prompt. Start with the model default, lower it for routine scoped work, and raise it only when task difficulty warrants the cost.
+
+**Execution Order** — include it whenever the work splits across parallel agents or has a step that others depend on. Partition by file: each agent gets a disjoint set and is forbidden from writing outside it. Anything several agents would share — a data layer, a common helper, a config module — goes in its own earlier serial step, because two agents editing one file conflict or silently overwrite each other. If the work cannot be partitioned by file at all, drop the parallelism and number the steps. When the block is present, add "no file appears in more than one agent's diff" to Acceptance Criteria.
 
 **Claude Code only — add Session Strategy block when relevant:**
 ```

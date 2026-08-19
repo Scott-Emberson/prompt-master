@@ -128,11 +128,11 @@ Do not assume one universal Claude default. When unsure, start with **Claude Opu
 - Do not assume the Claude Code model. Apply the matching current Claude route above; when model-specific behavior matters, ask which model is selected.
 - Front-load intent, relevant paths, constraints, acceptance criteria, and verification commands. Explicitly request tool use when inspection is required.
 - Current Fable/Opus models can over-scope and delegate readily. Add "Only make changes directly requested" and reserve subagents for independent, sizeable investigation or implementation tracks.
-- When a prompt splits work across parallel agents, give each agent a disjoint set of files and forbid writes outside it. Two agents editing the same file will conflict or silently overwrite each other. If the work cannot be partitioned by file, serialize it into numbered steps instead of parallelizing.
+- When a prompt splits work across parallel agents, give each agent a disjoint set of files and forbid writes outside it. Two agents editing the same file will conflict or silently overwrite each other. If the work cannot be partitioned by file, serialize it into numbered steps instead of parallelizing. Template M's Execution Order block is where the partition and the step sequence go.
 - Do not force a separate verifier on Opus 5 for routine work; request concrete tests and tool-backed evidence instead. For long Fable 5 runs, require progress claims to cite actual tool results.
 - Always scope to specific files and directories — never give a global instruction without a path anchor
 - Human review triggers required: "Stop and ask before deleting any file, adding any dependency, or affecting the database schema"
-- For complex tasks, use Template M. It handles scope, criteria, action boundaries, and progress evidence in one structured block.
+- For complex tasks, use Template M. It handles scope, execution order, criteria, action boundaries, and progress evidence in one structured block.
 
 ## Cortex Code (Snowflake's CLI coding agent)
 - Agentic like Claude Code — runs tools, edits files, executes SQL, and manages Snowflake objects autonomously
