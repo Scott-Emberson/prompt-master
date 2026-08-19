@@ -1,0 +1,8 @@
+# This repo is text only. Normalise everything to LF in the index and in the
+# working tree, on every platform.
+#
+# Without this, core.autocrlf=true gives Windows contributors CRLF working
+# copies while CI checks out LF. tests/check-docs.mjs normalises on read so it
+# survives either, but keeping the tree consistent is cheaper than defending
+# against the difference everywhere.
+* text=auto eol=lf
