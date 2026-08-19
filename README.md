@@ -4,7 +4,9 @@
 
 A Claude skill that writes the accurate prompts for any AI tool. Zero tokens or credits wasted. Full context and memory retention. No re-prompting your way to an answer you should have gotten on attempt one.
 
-**Works with:** Claude, ChatGPT, Codex, Grok, Gemini, o1/o3, MiniMax, Cursor, Claude Code, GitHub Copilot, Windsurf, Bolt, v0, Lovable, Devin, Perplexity, Midjourney, DALL-E, Stable Diffusion, ComfyUI, Sora, Runway, ElevenLabs, Zapier, Make, and any AI tool you throw at it.
+**Works with:** Claude, ChatGPT, Codex, Grok, Gemini, o1/o3, MiniMax, Meta AI, Cursor, Claude Code, Cortex Code, GitHub Copilot, Windsurf, Bolt, v0, Lovable, Devin, Perplexity, Midjourney, DALL-E, Stable Diffusion, Nano Banana 2, Grok Imagine, ComfyUI, Sora, Runway, Gemini Omni, ElevenLabs, Zapier, Make, and any AI tool you throw at it.
+
+> **Fork note.** This is a maintained fork of [nidhinjs/prompt-master](https://github.com/nidhinjs/prompt-master). It carries the upstream skill plus the open pull requests and issues that were still unmerged there, reconciled against current models. Install commands below point at this fork; see the Version History for what differs.
 
 ---
 
@@ -21,7 +23,7 @@ A Claude skill that writes the accurate prompts for any AI tool. Zero tokens or 
 Install as a Claude Code plugin straight from this repo — it doubles as its own marketplace:
 
 ```bash
-/plugin marketplace add nidhinjs/prompt-master
+/plugin marketplace add Scott-Emberson/prompt-master
 /plugin install prompt-master@prompt-master
 ```
 
@@ -35,7 +37,7 @@ Updating later is one command:
 
 ```bash
 mkdir -p ~/.claude/skills
-git clone https://github.com/nidhinjs/prompt-master.git ~/.claude/skills/prompt-master
+git clone https://github.com/Scott-Emberson/prompt-master.git ~/.claude/skills/prompt-master
 ```
 
 ## 🔥 The Problem This Solves
@@ -209,7 +211,7 @@ Done When:
 
 ## 🤝 Works With Any AI Tool
 
-Prompt Master includes specific profiles for 20+ tools. For anything not on the list, it uses a **Universal Fingerprint**: 4 questions that let it write a quality prompt for any AI system it has never seen before.
+Prompt Master includes specific profiles for 30+ tools. For anything not on the list, it uses a **Universal Fingerprint**: 4 questions that let it write a quality prompt for any AI system it has never seen before.
 
 <details>
 <summary><h3> Click to view all 30+ tool profiles </h3></summary>
@@ -220,14 +222,16 @@ Prompt Master includes specific profiles for 20+ tools. For anything not on the 
 | **ChatGPT / GPT-5.6** | Reasoning and agentic LLM | Sol/Terra/Luna routing, lean contracts, autonomy and effort control |
 | **Codex** | Coding agent | File scope, approval boundaries, verification, bounded subagents |
 | **Grok 4.6** | Reasoning and agentic LLM | Search grounding, reasoning effort, tools, caching, and stop conditions |
-| **Gemini 2.x** | Reasoning LLM | Grounding anchors, citation rules, format locks |
+| **Gemini 3.x** | Reasoning LLM | Tier routing, thinking level, grounding anchors, citation rules, format locks |
+| **Meta AI** | Consumer LLM | No system slot: role, contract, and constraints folded into one message |
 | **o3 / o4-mini** | Thinking LLM | Short clean instructions only — never adds CoT (they think internally) |
 | **Ollama** | Local LLM | Asks which model is loaded, includes system prompt for Modelfile |
 | **Qwen 2.5 / Qwen3** | Open-weight LLM | Chat template format, thinking vs non-thinking mode detection |
 | **Local models (Llama, Mistral)** | Open-weight LLM | Shorter prompts, simpler structure, no complex nesting |
 | **DeepSeek-R1** | Reasoning LLM | Short clean instructions, strips CoT, suppresses thinking output if needed |
 | **MiniMax (M3 / M2.7)** | Reasoning LLM | Temperature clamping, thinking tag control, structured output optimization |
-| **Claude Code** | Agentic AI | Stop conditions, file scope, checkpoint output |
+| **Claude Code** | Agentic AI | Stop conditions, file scope, checkpoint output, disjoint parallel-agent scope |
+| **Cortex Code** | Agentic AI | Snowflake-native tooling, tracked steps, warehouse-spend stop conditions |
 | **Cursor / Windsurf** | IDE AI | File path, function name, do-not-touch list, sequential prompt guidance |
 | **Cline (formerly Claude Dev)** | Agentic IDE | File scope, approval gates, stop conditions, task breakdown |
 | **GitHub Copilot** | Autocomplete AI | Exact function contract as docstring |
@@ -245,12 +249,16 @@ Prompt Master includes specific profiles for 20+ tools. For anything not on the 
 | **DALL-E 3** | Image AI | Prose description, text exclusion — edit vs generate detection |
 | **Stable Diffusion** | Image AI | Weight syntax `(word:1.3)`, CFG guidance, mandatory negative prompt |
 | **SeeDream** | Image AI | Art style first, mood and atmosphere descriptors, negative prompt |
+| **Nano Banana 2** | Image AI | Conversational deltas, in-image text, named multi-image references |
+| **Grok Imagine** | Image / Video AI | Still vs clip intent, one camera move per clip, positive-phrased exclusions |
+| **Atlas Cloud** | Image / Video gateway | Resolves the underlying model first, keeps API params out of the prompt |
 | **ComfyUI** | Image AI | Positive/negative node split, checkpoint-specific syntax |
 | **Meshy / Tripo / Rodin** | 3D AI | Style + export format + polygon budget + rig requirements |
 | **BlenderGPT** | 3D AI | Python script output, Blender version, scene context |
 | **Unity AI** | 3D / Game AI | Game genre, platform target, mechanic description over code |
 | **Sora / Runway** | Video AI | Camera movement, duration, cut style |
 | **LTX / Dream Machine / Kling** | Video AI | Cinematic language, motion intensity, style reference |
+| **Gemini Omni** | Video AI | 10s clip decomposition, verbatim continuity header, multi-turn deltas |
 | **ElevenLabs** | Voice AI | Emotion, pacing, emphasis, speech rate |
 | **Zapier / Make / n8n** | Workflow automation | Trigger app + event, action app + field mapping |
 
@@ -299,7 +307,7 @@ Prompt Master only uses techniques with reliable, bounded effects. Methods known
 
 ---
 
-## 🚫 37 Credit-Killing Patterns Detected (with Before/After Examples)
+## 🚫 39 Credit-Killing Patterns Detected (with Before/After Examples)
 
 <details>
 <summary><h3> Task Patterns (7)</h3></summary>
@@ -412,6 +420,7 @@ This is the single biggest fix for long sessions. Most wasted re-prompts come fr
 
 ## ℹ️ Version History
 
+- **1.9.0** — Progressive disclosure and issue fixes. Moved the 33 tool profiles into `references/tool-profiles.md` and the volatile model facts into `references/models.md` (dated per vendor, with a refresh protocol), cutting SKILL.md from 460 lines to 280 so a routine invocation loads far less. Added Gemini 3.x, Gemini Omni video, Nano Banana 2, Grok Imagine, Meta AI, and Cortex Code profiles. Added sensitive-data handling, a defined exit condition for the verification gate, question-limit precedence, and a rule that parallel agents must own disjoint files. Patterns 38 and 39 added.
 - **1.8.0** — Current-model refresh. Added Claude Fable 5, Opus 5, Sonnet 5, GPT-5.6 Sol/Terra/Luna, Codex, and Grok 4.6 routing. Replaced hidden chain-of-thought requests with auditable reasoning and generalized the Claude task brief for current adaptive-thinking models.
 - **1.7.0** — Opus 4.8 compatibility. Made Claude 4.x routing version-aware: durable advice generalized across 4.6/4.7/4.8, added Opus 4.8 (current default) profile, kept Opus 4.7 labeled. De-hardcoded the effort-level note (now harness-managed). Template M and pattern 36 cover 4.7 and 4.8. Fixed a stray fragment in patterns.md.
 - **1.6.0** — Opus 4.7 update. Added Template M (Opus 4.7 Task Brief). Updated Claude and Claude Code routing for literalism, adaptive thinking, xhigh effort, and session hygiene. Added patterns 36–37.
