@@ -1,0 +1,41 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+# Needs write to create the release and attach the ZIP; nothing else.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and attach claude.ai skill ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check docs structure
+        run: node tests/check-docs.mjs
+
+      # claude.ai's uploader requires the archive's single top-level entry to
+      # be a directory named exactly like the skill ("prompt-master/"), which
+      # GitHub's auto-generated source ZIP ("prompt-master-<ref>/") never is.
+      - name: Build claude.ai skill ZIP
+        run: |
+          cp LICENSE skills/prompt-master/LICENSE
+          cd skills
+          zip -r ../prompt-master.zip prompt-master
+
+      - name: Create release and attach ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes "See the Version History section of the README." || true
+          gh release upload "$GITHUB_REF_NAME" prompt-master.zip --clobber

@@ -1,10 +1,10 @@
-![](https://i.postimg.cc/kG03s7tk/prompt-banner.png)
+![prompt-master](assets/prompt-banner.png)
 
 <br/>
 
 A Claude skill that writes the accurate prompts for any AI tool. Zero tokens or credits wasted. Full context and memory retention. No re-prompting your way to an answer you should have gotten on attempt one.
 
-**Works with:** Claude, ChatGPT, Codex, Grok, Gemini, o1/o3, MiniMax, Meta AI, Cursor, Claude Code, Cortex Code, GitHub Copilot, Windsurf, Bolt, v0, Lovable, Devin, Perplexity, Midjourney, DALL-E, Stable Diffusion, Nano Banana 2, Grok Imagine, ComfyUI, Sora, Runway, Gemini Omni, ElevenLabs, Zapier, Make, and any AI tool you throw at it.
+**Works with:** Claude, ChatGPT, Codex, Grok, Gemini, o3/o4-mini, MiniMax, Meta AI, Cursor, Claude Code, Cortex Code, GitHub Copilot, Windsurf, Bolt, v0, Lovable, Devin, Perplexity, Midjourney, DALL-E, Stable Diffusion, Nano Banana 2, Grok Imagine, ComfyUI, Sora, Runway, Gemini Omni, ElevenLabs, Zapier, Make, and any AI tool you throw at it.
 
 > **Fork note.** This is a maintained fork of [nidhinjs/prompt-master](https://github.com/nidhinjs/prompt-master). It carries the upstream skill plus the open pull requests and issues that were still unmerged there, reconciled against current models. Install commands below point at this fork; see the Version History for what differs.
 
@@ -14,8 +14,10 @@ A Claude skill that writes the accurate prompts for any AI tool. Zero tokens or 
 
 ### RECOMMENDED - Claude.ai (browser)
 
-1. Download this repo as a ZIP
+1. Download `prompt-master.zip` from the [latest release](https://github.com/Scott-Emberson/prompt-master/releases/latest) — a ready-to-upload build whose top-level folder matches the skill name, which the uploader requires (the repo's own ZIP does not qualify)
 2. Go to **claude.ai → Sidebar → Customize → Skills → Upload a Skill**
+
+Updating later: download the new release ZIP and upload it again.
 
 
 ### RECOMMENDED - Claude Code (plugin)
@@ -33,12 +35,59 @@ Updating later is one command:
 /plugin marketplace update prompt-master
 ```
 
-### OR Clone directly into Claude Code skills directory (Not Suggested)
+### GitHub Copilot — and any Agent Skills-compatible tool
+
+The same skill installs into GitHub Copilot (CLI, coding agent, code review, VS Code and JetBrains agent mode) through the [Agent Skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) standard. Requires GitHub CLI v2.90+.
 
 ```bash
-mkdir -p ~/.claude/skills
-git clone https://github.com/Scott-Emberson/prompt-master.git ~/.claude/skills/prompt-master
+# personal: available in every project
+gh skill install Scott-Emberson/prompt-master prompt-master --scope user
+
+# or per-project: commits into .agents/skills/, shared with your team
+gh skill install Scott-Emberson/prompt-master prompt-master
+
+# update later
+gh skill update --all
+
+# pin a version
+gh skill install Scott-Emberson/prompt-master prompt-master --pin v1.11.0
 ```
+
+In VS Code, enable **Chat: Use Agent Skills** (`chat.useAgentSkills`). Copilot loads project skills from `.github/skills/`, `.claude/skills/`, or `.agents/skills/`, and personal skills from `~/.copilot/skills/`, `~/.claude/skills/`, or `~/.agents/skills/`.
+
+The same command also serves Claude Code without the plugin system:
+
+```bash
+gh skill install Scott-Emberson/prompt-master prompt-master --agent "claude code" --scope user
+```
+
+### 🔄 Staying updated
+
+Each channel updates differently — two can be fully automatic, one cannot:
+
+| Channel | Update story |
+|---|---|
+| **Claude Code plugin** | Automatic. The marketplace's pinned `version` field bumps on every release and Claude Code picks it up in the background — nothing to configure. |
+| **GitHub Copilot / `gh skill`** | `gh skill update --all` pulls every unpinned skill to the latest tagged release. It has no daemon, so schedule it once and it becomes automatic (recipes below). |
+| **claude.ai ZIP upload** | No update channel exists on the platform — uploaded skills are frozen until you re-upload, and the Skills API only reaches API workspaces, not claude.ai. Watch this repo (**Watch → Custom → Releases**) or subscribe to [releases.atom](https://github.com/Scott-Emberson/prompt-master/releases.atom); every release carries a ready-to-upload `prompt-master.zip`. |
+
+**Auto-update recipes for `gh skill`:**
+
+Personal scope, macOS/Linux — run daily via cron:
+
+```bash
+(crontab -l 2>/dev/null; echo '17 9 * * * gh skill update --all') | crontab -
+```
+
+Personal scope, Windows — run daily via Task Scheduler:
+
+```powershell
+schtasks /create /tn "gh-skill-update" /tr "\"$((Get-Command gh).Source)\" skill update --all" /sc daily /st 09:00
+```
+
+Project scope (skills committed into `.agents/skills/`) — copy [`examples/copilot-skill-auto-update.yml`](examples/copilot-skill-auto-update.yml) into your repo's `.github/workflows/`; it runs weekly and opens a PR whenever a skill has a new release.
+
+Pinned installs (`--pin`) are always skipped by design — unpin to rejoin auto-updates.
 
 ## 🔥 The Problem This Solves
 
@@ -99,7 +148,7 @@ I want to ask Claude Code to build a todo app with React and Supabase
 Prompt Master runs a structured pipeline on every request:
 
 1. **Detects the target tool** — figures out which AI system the prompt is for and routes silently to the right approach
-2. **Extracts 9 dimensions of intent** — task, input, output, constraints, context, audience, memory, success criteria, examples
+2. **Extracts 9 dimensions of intent** — task, target tool, output format, constraints, input, context, audience, success criteria, examples
 3. **Asks targeted clarifying questions** — max 3 questions if critical info is missing, never more
 4. **Routes to the right framework** — picks and applies the correct prompt architecture automatically, never shown to the user
 5. **Applies safe techniques only** — role assignment, few-shot examples, XML structure, grounding anchors, memory block as needed
@@ -124,7 +173,7 @@ shallow depth of field --ar 16:9 --v 6 --style raw
 
 negative: blurry, low quality, watermark, cartoon, anime, extra limbs
 ```
-**🎯 Target:** Midjourney · **⚡ Framework:** Visual Descriptor · **💰 Tokens:** Light (~60) · **💡 Strategy:** Comma-separated descriptors over prose, lighting and mood anchored early, aspect ratio and version locked, negative prompt prevents style drift.
+**🎯 Target:** Midjourney · **💡 Strategy:** Comma-separated descriptors over prose, lighting and mood anchored early, aspect ratio and version locked, negative prompt prevents style drift.
 
 ---
 ## Full Example #2: Generating Prompts for Coding
@@ -205,7 +254,7 @@ Done When:
 - Hover states work on all interactive elements
 - Opens in browser with zero console errors
 ```
-**🎯 Target:** Claude Code · **💰 Tokens:** Medium (~380) · **💡 Strategy:** Every vague Notion aesthetic cue translated into exact hex values and pixel specs — Claude Code cannot guess wrong. Animations defined with exact timing, method, and trigger so there is no interpretation needed.
+**🎯 Target:** Claude Code · **💡 Strategy:** Every vague Notion aesthetic cue translated into exact hex values and pixel specs — Claude Code cannot guess wrong. Animations defined with exact timing, method, and trigger so there is no interpretation needed.
 
 ---
 
@@ -244,7 +293,7 @@ Prompt Master includes specific profiles for 30+ tools. For anything not on the 
 | **OpenAI Atlas** | Computer-use agent | Outcome over navigation steps, permission boundaries, stop before irreversible actions |
 | **Perplexity Computer** | Computer-use agent | Artifact-first prompting, scoped permissions, verification steps |
 | **OpenClaw** | Computer-use agent | Conversational precision, persistent memory, security constraints |
-| **Perplexity / SearchGPT** | Search AI | Mode spec: search vs analyze vs compare |
+| **Perplexity / Manus** | Search and orchestration AI | Mode spec: search vs analyze vs compare, end-deliverable framing |
 | **Midjourney** | Image AI | Comma-separated descriptors, parameters, negative prompts |
 | **DALL-E 3** | Image AI | Prose description, text exclusion — edit vs generate detection |
 | **Stable Diffusion** | Image AI | Weight syntax `(word:1.3)`, CFG guidance, mandatory negative prompt |
@@ -295,7 +344,7 @@ Prompt Master picks the right architecture for every task automatically and rout
 
 ## 🛡️ 5 Safe Techniques, Applied When Needed
 
-Prompt Master only uses techniques with reliable, bounded effects. Methods known to produce hallucinations or unpredictable output (Tree of Thought, Graph of Thought, Universal Self-Consistency, prompt chaining) are explicitly excluded.
+Prompt Master only uses techniques with reliable, bounded effects. Methods known to produce hallucinations or unpredictable output (Mixture of Experts, Tree of Thought, Graph of Thought, Universal Self-Consistency, prompt chaining) are never applied on their own — only when you explicitly ask for one and the target tool supports it.
 
 | Technique | What It Does |
 |-----------|-------------|
@@ -385,7 +434,7 @@ Prompt Master only uses techniques with reliable, bounded effects. Methods known
 </details>
 
 <details>
-<summary><h3> Agentic Patterns (7)</h3></summary>
+<summary><h3> Agentic Patterns (9)</h3></summary>
 
 | # | Pattern | Before | After |
 |---|---------|--------|-------|
@@ -396,6 +445,8 @@ Prompt Master only uses techniques with reliable, bounded effects. Methods known
 | 35 | **No human review trigger** | Agent decides everything | "Stop and ask before: deleting any file, adding any dependency, or touching the database schema" |
 | 36 | **Vague first turn for an agentic model** | "fix the auth bug" with no scope, files, or criteria | Front-load outcome, context, scope, boundaries, and acceptance criteria |
 | 37 | **Context rot on long sessions** | Repeated corrections leave stale assumptions in context | Start fresh for unrelated work or compact around current decisions and state |
+| 38 | **Parallel agents on the same file** | Work split across 4 agents, all pointed at the same module | Give each agent a disjoint file set and forbid writes outside it |
+| 39 | **Sensitive input pasted verbatim** | Real credentials or customer records copied into the prompt body | Paraphrase the intent, placeholder the identifiers, and note the redaction |
 
 </details>
 
@@ -420,6 +471,7 @@ This is the single biggest fix for long sessions. Most wasted re-prompts come fr
 
 ## ℹ️ Version History
 
+- **1.11.0** — Full-codebase review fixes. Template L now redacts the echoed original, not just the rewrite, and check 12 enforces it. The docs checker closed four false-pass modes (tilde-fence desync, fenced format markers, crash-abort masking, unbounded table binding) and gained two structural comparisons: README's pattern rows against patterns.md, which restored the missing patterns 38-39, and README's tool table against the routing index, which retired the phantom SearchGPT row. The untrusted-content rule now covers fetched docs and search results, the agentic warning reaches browser and payment-capable agents, models.md reads are scoped to one vendor section, the CI job runs with a read-only token, and the README's examples, dimension list, and technique policy were realigned with SKILL.md. Also formal packaging: the skill moved to the canonical `skills/prompt-master/` layout, which Claude Code plugins auto-discover, the claude.ai release ZIP is built from, and GitHub Copilot's `gh skill` installer expects; frontmatter now carries `license` and `metadata.version` per the agent-skills spec instead of the top-level `version:` the uploaders reject; both manifests gained their schema and metadata fields; and a release workflow builds and attaches the claude.ai ZIP on every version tag.
 - **1.10.0** — Verified the model facts against vendor sources instead of carrying them on trust. Five vendor sections in `references/models.md` moved from UNVERIFIED to dated, and three were materially wrong: MiniMax M3 recommends temperature 1.0 while the file carried a hard "must be at or below 1" clamp from an earlier generation, Gemini's Pro and Flash tiers had both moved (and the promised 3.5 Pro never shipped), and the Gemini Omni 10-second clip cap turned out to be undocumented folklore rather than a published limit. DeepSeek, Qwen, Meta, and Ollama stay marked UNVERIFIED rather than being dressed up as checked.
 - **1.9.4** — Three things this README advertised that the skill did not implement. The Safe Techniques section promised five and SKILL.md defined four: XML structural tags were used by the Claude profile and Template F but never listed as a technique, so they are now one. The **Universal Fingerprint** was named here and existed nowhere — the unknown-tool rule now asks its four questions (input format, system/user separation, dominant failure mode, memory) and each answer changes how the prompt is built. The tool table listed an "OpenAI Computer Use" profile that does not exist; the profile covers OpenAI Atlas, and the row now says what Atlas actually needs.
 - **1.9.3** — Template L declared four Decompiler tasks but shipped output formats for three; Simplify had none and silently fell back to the Break-down shape. Added a Simplify format that forces the pass to account for every removal and to name anything load-bearing it deliberately kept, since over-trimming is how a simplify pass fails.
@@ -446,6 +498,6 @@ MIT: See [LICENSE](LICENSE) for details.
 
 ## ⭐ Star History
 
-[![Star History Chart](https://star-history.dera.page/svg?repos=nidhinjs/prompt-master&type=Date)](https://star-history.dera.page/#nidhinjs/prompt-master&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Scott-Emberson/prompt-master&type=Date)](https://star-history.com/#Scott-Emberson/prompt-master&Date)
 
 ---

@@ -142,7 +142,7 @@ Do not assume one universal Claude default. When unsure, start with **Claude Opu
 - Snowflake-native: prefer the `snowflake_sql_execute` tool for SQL and `st.connection("snowflake")` for Streamlit in Snowflake apps over raw connectors
 - Stop conditions and human review triggers are critical — same runaway-loop and credit-burn risk as Claude Code, plus live warehouse spend
 - For complex tasks use `cortex ctx task add` / `cortex ctx step add` to break work into tracked steps — the agent loses coherence on long unstructured tasks
-- Headless mode (`cortex -p "prompt" --output-format stream-json`) is available for CI and automation — output is JSON events, not plain text
+- Headless mode is available for CI and automation (`--output-format stream-json`; output is JSON events, not plain text). Pass the prompt from a file — `cortex -p "$(cat prompt.txt)" --output-format stream-json` — or single-quote it inline. Never paste a generated prompt into a double-quoted shell string: generated prompts carry backticks, `$`, and quotes, and a double-quoted POSIX shell executes them
 
 ## Codex CLI / ChatGPT Work / Codex IDE
 - Use the GPT-5.6 route above. Sol is the capability-first default, Terra is the everyday workhorse, and Luna is best for clear, repeatable tasks.

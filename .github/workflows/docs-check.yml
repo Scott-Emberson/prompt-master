@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+# The job only reads the tree and exits with a status code. Pin the token to
+# that, rather than inheriting whatever the repository default happens to be.
+permissions:
+  contents: read
+
 jobs:
   docs-check:
     name: Structural docs check

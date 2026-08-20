@@ -1,5 +1,7 @@
 {
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
   "name": "prompt-master",
+  "description": "Marketplace distributing the Prompt Master prompt-engineering skill.",
   "owner": {
     "name": "Scott-Emberson",
     "url": "https://github.com/Scott-Emberson"
@@ -7,9 +9,19 @@
   "plugins": [
     {
       "name": "prompt-master",
-      "source": ".",
-      "version": "1.10.0",
-      "description": "Generates optimized, token-efficient prompts for any AI tool."
+      "source": "./",
+      "version": "1.11.0",
+      "description": "Generates optimized, token-efficient prompts for any AI tool.",
+      "author": {
+        "name": "Scott-Emberson",
+        "url": "https://github.com/Scott-Emberson"
+      },
+      "license": "MIT",
+      "homepage": "https://github.com/Scott-Emberson/prompt-master",
+      "repository": "https://github.com/Scott-Emberson/prompt-master",
+      "category": "productivity",
+      "tags": ["prompt-engineering", "prompts"],
+      "keywords": ["prompt-engineering", "prompts", "claude-skill", "ai-tools"]
     }
   ]
 }

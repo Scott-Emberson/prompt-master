@@ -16,11 +16,24 @@
 // No dependencies, no package.json, no test runner. Plain Node ESM.
 // -----------------------------------------------------------------------------
 
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+// -----------------------------------------------------------------------------
+// Canonical skill layout
+// -----------------------------------------------------------------------------
+// The skill lives at skills/prompt-master/ — the nested layout every channel
+// agrees on: Claude Code plugins auto-discover skills/, the claude.ai dist ZIP
+// is built from this directory, and `gh skill` finds skills/*/SKILL.md.
+const SKILL_DIR = 'skills/prompt-master';
+const SKILL_FILE = `${SKILL_DIR}/SKILL.md`;
+const TEMPLATES_FILE = `${SKILL_DIR}/references/templates.md`;
+const PATTERNS_FILE = `${SKILL_DIR}/references/patterns.md`;
+const MODELS_FILE = `${SKILL_DIR}/references/models.md`;
+const PROFILES_FILE = `${SKILL_DIR}/references/tool-profiles.md`;
 
 // -----------------------------------------------------------------------------
 // Routing alias map
@@ -79,7 +92,14 @@ const fileCache = new Map();
  */
 function read(rel) {
   if (fileCache.has(rel)) return fileCache.get(rel);
-  const abs = join(ROOT, rel);
+  // Contain every read inside the repo. Paths arrive from data files such as
+  // tests/contracts.json, and join() collapses ../ segments, so an unchecked
+  // path would resolve outside ROOT and read whatever lives there.
+  const abs = resolve(ROOT, rel);
+  if (abs !== ROOT && !abs.startsWith(ROOT + sep)) {
+    fileCache.set(rel, null);
+    return null;
+  }
   if (!existsSync(abs)) {
     fileCache.set(rel, null);
     return null;
@@ -104,16 +124,24 @@ function toRel(abs) {
   return abs.slice(ROOT.length + 1).split(sep).join('/');
 }
 
-/** Every markdown file in the repo, .git and node_modules excluded. */
+/**
+ * Every markdown file in the repo, .git and node_modules excluded.
+ *
+ * Symlinks are never followed: a committed link can point outside the repo or
+ * at an ancestor of itself, turning the walk into an out-of-tree read or an
+ * ELOOP crash. Directory entries are classified with lstat semantics
+ * (withFileTypes) so a link is a link, not whatever it resolves to.
+ */
 function markdownFiles() {
   const out = [];
   const skip = new Set(['.git', 'node_modules', '.github']);
   (function walk(dir) {
-    for (const entry of readdirSync(dir)) {
-      if (skip.has(entry)) continue;
-      const abs = join(dir, entry);
-      if (statSync(abs).isDirectory()) walk(abs);
-      else if (entry.toLowerCase().endsWith('.md')) out.push(toRel(abs));
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (skip.has(entry.name)) continue;
+      if (entry.isSymbolicLink()) continue;
+      const abs = join(dir, entry.name);
+      if (entry.isDirectory()) walk(abs);
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) out.push(toRel(abs));
     }
   })(ROOT);
   return out.sort();
@@ -123,26 +151,35 @@ function markdownFiles() {
 // Markdown helpers
 // -----------------------------------------------------------------------------
 
-const FENCE_RE = /^\s*(```|~~~)/;
+const FENCE_RE = /^\s*(```+|~~~+)/;
 const HEADING_RE = /^(#{1,6})\s+(.*?)\s*$/;
 const BOLD_LINE_RE = /^\*\*.+\*\*:?\s*$/;
 
 /**
- * Walk lines while tracking fenced code blocks. Yields { line, index, fenced }.
- * Template M's body is a fenced block full of `## Objective` style lines, so
- * anything that scans for headings has to know where the fences are.
+ * Walk lines while tracking fenced code blocks. Yields { line, index, fenced,
+ * isFence, fenceKind }. Template M's body is a fenced block full of
+ * `## Objective` style lines, so anything that scans for headings has to know
+ * where the fences are.
+ *
+ * The tracker remembers WHICH marker opened the block: a ``` fence is only
+ * closed by ```, a ~~~ fence only by ~~~. A ~~~ line inside a backtick fence
+ * is content, not a toggle. Treating the two markers as interchangeable is how
+ * one stray tilde line used to flip the state and silently blind every
+ * fence-aware check for the rest of the file.
  */
 function* walkLines(text) {
   const lines = text.split('\n');
-  let fenced = false;
+  let openMarker = null; // null | '```' | '~~~'
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (FENCE_RE.test(line)) {
-      fenced = !fenced;
-      yield { line, index: i, fenced: true, isFence: true };
+    const m = line.match(FENCE_RE);
+    const kind = m ? m[1].slice(0, 3) : null;
+    if (kind && (openMarker === null || kind === openMarker)) {
+      openMarker = openMarker === null ? kind : null;
+      yield { line, index: i, fenced: true, isFence: true, fenceKind: kind };
       continue;
     }
-    yield { line, index: i, fenced, isFence: false };
+    yield { line, index: i, fenced: openMarker !== null, isFence: false, fenceKind: null };
   }
 }
 
@@ -225,13 +262,20 @@ function githubSlug(headingText) {
     .replace(/ /g, '-');
 }
 
-/** Parse a GitHub-flavoured markdown table starting at or after `fromLine`. */
-function parseTable(text, fromLine) {
+/**
+ * Parse a GitHub-flavoured markdown table starting at or after `fromLine`,
+ * searching only lines before `untilLine` (1-based, inclusive). Without the
+ * bound, a caller whose table has been deleted silently binds to whatever
+ * table comes next in the file and reports conclusions drawn from wrong data.
+ */
+function parseTable(text, fromLine, untilLine = Infinity) {
   const lines = text.split('\n');
+  const stop = Math.min(lines.length, untilLine);
   let i = fromLine;
-  while (i < lines.length && !lines[i].trim().startsWith('|')) i++;
+  while (i < stop && !lines[i].trim().startsWith('|')) i++;
+  if (i >= stop) return null;
   const rows = [];
-  for (; i < lines.length; i++) {
+  for (; i < stop; i++) {
     const raw = lines[i];
     if (!raw.trim().startsWith('|')) break;
     const cells = raw.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
@@ -262,29 +306,50 @@ function frontmatter(text) {
   const body = lines.slice(1, close);
   const pairs = [];
   const malformed = [];
+  let lastTopKey = null;
   for (let i = 0; i < body.length; i++) {
     const line = body[i];
     if (line.trim() === '') continue;
-    const m = line.match(/^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$/);
-    if (!m) { malformed.push({ line: i + 2, text: line }); continue; }
-    pairs.push({ key: m[1], value: m[2], line: i + 2, raw: line });
+    const top = line.match(/^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$/);
+    if (top) {
+      pairs.push({ key: top[1], value: top[2], line: i + 2, raw: line });
+      lastTopKey = top[1];
+      continue;
+    }
+    // One level of nesting, as the agent-skills spec uses for `metadata:`.
+    // An indented `key: value` under a top-level key becomes `parent.key`.
+    const sub = lastTopKey && line.match(/^\s+([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$/);
+    if (sub) {
+      pairs.push({ key: `${lastTopKey}.${sub[1]}`, value: sub[2], line: i + 2, raw: line });
+      continue;
+    }
+    malformed.push({ line: i + 2, text: line });
   }
   return { ok: true, pairs, malformed, closeLine: close + 1 };
 }
 
+/** Strip one layer of surrounding quotes from a frontmatter value. */
+function unquote(v) {
+  if (v === undefined) return v;
+  const m = v.match(/^"(.*)"$/) || v.match(/^'(.*)'$/);
+  return m ? m[1] : v;
+}
+
 check(1, 'Version string agrees across all four places that state it', () => {
-  const skill = read('SKILL.md');
+  const skill = read(SKILL_FILE);
   const plugin = readJson('.claude-plugin/plugin.json');
   const market = readJson('.claude-plugin/marketplace.json');
   const readme = read('README.md');
 
   const found = [];
 
-  if (skill === null) fail('SKILL.md is missing', ['expected SKILL.md at the repo root']);
+  if (skill === null) fail(`${SKILL_FILE} is missing`, [`expected ${SKILL_FILE}`]);
   else {
+    // The agent-skills spec forbids a top-level `version` key; the sanctioned
+    // home is `metadata.version`, quoted because metadata values are strings.
     const fm = frontmatter(skill);
-    const v = fm.ok ? (fm.pairs.find((p) => p.key === 'version') || {}).value : undefined;
-    found.push({ where: 'SKILL.md frontmatter', value: v });
+    const v = fm.ok ? unquote((fm.pairs.find((p) => p.key === 'metadata.version') || {}).value) : undefined;
+    found.push({ where: `${SKILL_FILE} frontmatter metadata.version`, value: v });
   }
 
   found.push({
@@ -371,11 +436,11 @@ check(2, 'Both JSON manifests parse and the skill name agrees across them', () =
       names.push({ where: '.claude-plugin/marketplace.json .plugins[0].name', value: p0.name });
     }
   }
-  const skill = read('SKILL.md');
+  const skill = read(SKILL_FILE);
   if (skill !== null) {
     const fm = frontmatter(skill);
     const v = fm.ok ? (fm.pairs.find((p) => p.key === 'name') || {}).value : undefined;
-    names.push({ where: 'SKILL.md frontmatter name', value: v });
+    names.push({ where: `${SKILL_FILE} frontmatter name`, value: v });
   }
 
   const distinct = [...new Set(names.map((n) => n.value).filter((v) => v !== undefined))];
@@ -394,15 +459,19 @@ check(2, 'Both JSON manifests parse and the skill name agrees across them', () =
 // Check 3 - SKILL.md frontmatter is well formed
 // =============================================================================
 
-const EXPECTED_FRONTMATTER_KEYS = ['name', 'version', 'description'];
+// The agent-skills spec (agentskills.io) allows exactly these top-level keys.
+// Anything else makes the claude.ai / Skills API packagers reject the upload
+// with a hard error — a top-level `version:` was exactly that mistake.
+const ALLOWED_FRONTMATTER_KEYS = ['name', 'description', 'license', 'compatibility', 'metadata', 'allowed-tools'];
+const REQUIRED_FRONTMATTER_KEYS = ['name', 'description'];
 
 check(3, 'SKILL.md frontmatter is well formed', () => {
-  const skill = read('SKILL.md');
+  const skill = read(SKILL_FILE);
   if (skill === null) return;
   const fm = frontmatter(skill);
   if (!fm.ok) {
     fail('SKILL.md frontmatter block is malformed', [
-      'file: SKILL.md',
+      `file: ${SKILL_FILE}`,
       fm.error,
       'A skill without a parseable frontmatter block will not load at all.',
     ]);
@@ -410,28 +479,39 @@ check(3, 'SKILL.md frontmatter is well formed', () => {
   }
   if (fm.malformed.length) {
     fail('SKILL.md frontmatter has lines that are not key: value', [
-      'file: SKILL.md',
+      `file: ${SKILL_FILE}`,
       ...fm.malformed.map((m) => `  line ${m.line}: ${quote(m.text)}`),
       'Multi-line or wrapped values are the usual cause. Keep each value on one line.',
     ]);
   }
   const keys = fm.pairs.map((p) => p.key);
-  const extra = keys.filter((k) => !EXPECTED_FRONTMATTER_KEYS.includes(k));
-  const missing = EXPECTED_FRONTMATTER_KEYS.filter((k) => !keys.includes(k));
+  const topKeys = keys.filter((k) => !k.includes('.'));
+  const extra = topKeys.filter((k) => !ALLOWED_FRONTMATTER_KEYS.includes(k));
+  const missing = REQUIRED_FRONTMATTER_KEYS.filter((k) => !topKeys.includes(k));
   const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
   if (extra.length || missing.length || dupes.length) {
-    fail('SKILL.md frontmatter keys are not exactly name/version/description', [
-      'file: SKILL.md',
+    fail('SKILL.md frontmatter keys do not satisfy the agent-skills spec', [
+      `file: ${SKILL_FILE}`,
       `found: ${keys.map(quote).join(', ') || '(none)'}`,
-      ...(missing.length ? [`missing: ${missing.map(quote).join(', ')}`] : []),
-      ...(extra.length ? [`unexpected: ${extra.map(quote).join(', ')}`] : []),
+      ...(missing.length ? [`missing (required): ${missing.map(quote).join(', ')}`] : []),
+      ...(extra.length ? [`outside the allowed set (${ALLOWED_FRONTMATTER_KEYS.join(', ')}): ${extra.map(quote).join(', ')}`] : []),
       ...(dupes.length ? [`duplicated: ${[...new Set(dupes)].map(quote).join(', ')}`] : []),
+      'A key outside the allowed set makes the claude.ai and Skills API packagers reject the upload.',
+    ]);
+  }
+  const mv = fm.pairs.find((p) => p.key === 'metadata.version');
+  if (!mv || !/^"\d+\.\d+\.\d+"$/.test(mv.value)) {
+    fail('SKILL.md frontmatter has no quoted metadata.version', [
+      `file: ${SKILL_FILE}`,
+      mv ? `found: ${quote(mv.raw.trim())}` : 'no metadata.version pair found',
+      'Expected an indented `version: "X.Y.Z"` under `metadata:` — quoted, because the',
+      'spec requires metadata values to be strings. Check 1 reads the version from here.',
     ]);
   }
   const desc = fm.pairs.find((p) => p.key === 'description');
   if (desc && !/^description:\s+".*"$/.test(desc.raw)) {
     fail('SKILL.md description is not a single double-quoted line', [
-      'file: SKILL.md line ' + desc.line,
+      `file: ${SKILL_FILE} line ` + desc.line,
       `found: ${quote(desc.raw.slice(0, 120) + (desc.raw.length > 120 ? '...' : ''))}`,
       'The description must be one line wrapped in double quotes, because the loader reads it verbatim.',
     ]);
@@ -443,19 +523,23 @@ check(3, 'SKILL.md frontmatter is well formed', () => {
 // =============================================================================
 
 check(4, 'Code fences are balanced in every markdown file', () => {
+  // Walk with the SAME tracker every other check uses, so the balance guard
+  // and the parser can never disagree about what counts as a fence.
   for (const rel of markdownFiles()) {
     const text = read(rel);
-    const lines = text.split('\n');
-    const fenceLines = [];
-    for (let i = 0; i < lines.length; i++) {
-      if (/^\s*```/.test(lines[i])) fenceLines.push(i + 1);
+    let openKind = null;
+    let openLine = 0;
+    for (const { index, isFence, fenceKind } of walkLines(text)) {
+      if (!isFence) continue;
+      if (openKind === null) { openKind = fenceKind; openLine = index + 1; }
+      else openKind = null;
     }
-    if (fenceLines.length % 2 !== 0) {
-      fail(`Unbalanced code fences in ${rel}`, [
+    if (openKind !== null) {
+      fail(`Unclosed ${openKind} fence in ${rel}`, [
         `file: ${rel}`,
-        `${fenceLines.length} lines start with a triple backtick, which is odd, so one fence is never closed`,
-        `fence lines: ${fenceLines.join(', ')}`,
-        'An unclosed fence swallows the rest of the document when the skill is rendered.',
+        `a ${openKind} fence opened on line ${openLine} is never closed by a matching ${openKind} line`,
+        'An unclosed fence swallows the rest of the document when the skill is rendered, and it',
+        'silently blinds every fence-aware check past that point.',
       ]);
     }
   }
@@ -478,7 +562,16 @@ check(5, 'Every relative markdown link resolves on disk', () => {
         const target = m[1];
         if (/^[a-z][a-z0-9+.-]*:/i.test(target)) continue; // http:, mailto:, etc.
         if (target.startsWith('#')) continue; // in-page anchor, covered by check 7
-        const filePart = decodeURIComponent(target.split('#')[0]);
+        // A literal % that is not a valid escape throws URIError, which would
+        // abort this whole check and hide every later broken link. Fall back
+        // to the raw string: a target written without escaping should be
+        // resolved as written.
+        let filePart;
+        try {
+          filePart = decodeURIComponent(target.split('#')[0]);
+        } catch {
+          filePart = target.split('#')[0];
+        }
         if (filePart === '') continue;
         const abs = resolve(baseDir, filePart);
         if (!existsSync(abs)) {
@@ -507,12 +600,12 @@ function headingMatchesLabel(h, label) {
 }
 
 check(6, 'Routing Index rows and tool profiles cover each other exactly', () => {
-  const skill = read('SKILL.md');
-  const profiles = read('references/tool-profiles.md');
+  const skill = read(SKILL_FILE);
+  const profiles = read(PROFILES_FILE);
   if (skill === null || profiles === null) {
     fail('Cannot run the routing check', [
-      `SKILL.md: ${skill === null ? 'missing' : 'ok'}`,
-      `references/tool-profiles.md: ${profiles === null ? 'missing' : 'ok'}`,
+      `${SKILL_FILE}: ${skill === null ? 'missing' : 'ok'}`,
+      `${PROFILES_FILE}: ${profiles === null ? 'missing' : 'ok'}`,
     ]);
     return;
   }
@@ -520,17 +613,20 @@ check(6, 'Routing Index rows and tool profiles cover each other exactly', () => 
   const routingHeading = headings(skill).find((h) => /routing\s+index/i.test(h.text));
   if (!routingHeading) {
     fail('SKILL.md has no Routing Index heading', [
-      'file: SKILL.md',
+      `file: ${SKILL_FILE}`,
       'looked for a heading matching /routing index/i so the routing table could be located',
       'Without it nothing checks that the skill can find the profile it is told to read.',
     ]);
     return;
   }
 
-  const table = parseTable(skill, routingHeading.line);
+  const routingSec = section(skill, `${'#'.repeat(routingHeading.level)} ${routingHeading.text}`);
+  const table = routingSec && parseTable(skill, routingHeading.line, routingSec.endLine);
   if (!table) {
     fail('No table found under the Routing Index heading', [
-      `file: SKILL.md line ${routingHeading.line}`,
+      `file: ${SKILL_FILE} line ${routingHeading.line}`,
+      'The Routing Index section carries no table before the next heading, so the',
+      'bidirectional profile coverage assertion could not run at all.',
     ]);
     return;
   }
@@ -538,7 +634,7 @@ check(6, 'Routing Index rows and tool profiles cover each other exactly', () => 
   const profileCol = table.header.cells.findIndex((c) => /profile/i.test(c));
   if (profileCol === -1) {
     fail('Routing Index table has no profile column', [
-      `file: SKILL.md line ${table.header.line}`,
+      `file: ${SKILL_FILE} line ${table.header.line}`,
       `header cells: ${table.header.cells.map(quote).join(', ')}`,
       'Expected one column whose header mentions "profile".',
     ]);
@@ -571,8 +667,8 @@ check(6, 'Routing Index rows and tool profiles cover each other exactly', () => 
   }
   if (dangling.length) {
     fail('Routing Index points at profiles that do not exist', [
-      'file: SKILL.md (Routing Index table)',
-      'These "Profile to read" cells match no `## ` heading in references/tool-profiles.md:',
+      `file: ${SKILL_FILE} (Routing Index table)`,
+      `These "Profile to read" cells match no \`## \` heading in ${PROFILES_FILE}:`,
       '',
       ...dangling.map((d) =>
         `  line ${d.line}: ${quote(d.label)}${d.cell !== d.label ? ` (via alias for ${quote(d.cell)})` : ''}`),
@@ -587,8 +683,8 @@ check(6, 'Routing Index rows and tool profiles cover each other exactly', () => 
   const orphans = profileHeadings.filter((h) => !claimedHeadings.has(h.text));
   if (orphans.length) {
     fail('Tool profiles that no Routing Index row can reach', [
-      'file: references/tool-profiles.md',
-      'These `## ` sections are never named by a "Profile to read" cell in SKILL.md:',
+      `file: ${PROFILES_FILE}`,
+      `These \`## \` sections are never named by a "Profile to read" cell in ${SKILL_FILE}:`,
       '',
       ...orphans.map((h) => `  line ${h.line}: ${quote(h.text)}`),
       '',
@@ -601,8 +697,6 @@ check(6, 'Routing Index rows and tool profiles cover each other exactly', () => 
 // =============================================================================
 // Check 7 - templates: TOC, headings, letters, anchors
 // =============================================================================
-
-const TEMPLATES_FILE = 'references/templates.md';
 
 /** Template headings, as { letter, title, fullText, line }. */
 function templateHeadings() {
@@ -666,7 +760,8 @@ check(7, 'Templates TOC, headings, letters and anchors agree', () => {
     ]);
     return;
   }
-  const tocTable = parseTable(text, tocHeading.line);
+  const tocSec = section(text, `${'#'.repeat(tocHeading.level)} ${tocHeading.text}`);
+  const tocTable = tocSec && parseTable(text, tocHeading.line, tocSec.endLine);
   const tocEntries = [];
   if (tocTable) {
     for (const row of tocTable.body) {
@@ -780,8 +875,6 @@ check(8, 'Every "Template X" mentioned in the repo names a template that exists'
 // Check 9 - pattern numbering and every stated pattern count
 // =============================================================================
 
-const PATTERNS_FILE = 'references/patterns.md';
-
 check(9, 'Pattern numbering is contiguous and every stated count matches it', () => {
   const text = read(PATTERNS_FILE);
   if (text === null) {
@@ -830,10 +923,44 @@ check(9, 'Pattern numbering is contiguous and every stated count matches it', ()
     ]);
   }
 
+  // The README republishes the pattern table. Its numbered rows must be the
+  // same SET as this file's — an equal count is not enough, because a missing
+  // row plus a renumbered one hides behind the same total. This is also the
+  // only guard that sees claims the prose regex below cannot, such as
+  // "## 39 Credit-Killing Patterns Detected", where words intervene between
+  // the number and the word "patterns".
+  const readmeText = read('README.md');
+  if (readmeText !== null) {
+    const readmeNums = [];
+    const rLines = readmeText.split('\n');
+    for (let i = 0; i < rLines.length; i++) {
+      const m = rLines[i].match(/^\|\s*(\d+)\s*\|/);
+      if (m) readmeNums.push(Number(m[1]));
+    }
+    if (readmeNums.length) {
+      const readmeSet = new Set(readmeNums);
+      const missing = sortedNums.filter((n) => !readmeSet.has(n));
+      const extra = [...readmeSet].filter((n) => !seen.has(n)).sort((a, b) => a - b);
+      if (missing.length || extra.length) {
+        fail('README pattern table does not match references/patterns.md', [
+          'file: README.md',
+          ...(missing.length ? [`  in ${PATTERNS_FILE} but not in README: ${missing.join(', ')}`] : []),
+          ...(extra.length ? [`  in README but not in ${PATTERNS_FILE}: ${extra.join(', ')}`] : []),
+          'The README is the surface a user reads before installing; a missing row there',
+          'advertises less than the skill catches, an extra row advertises more.',
+        ]);
+      }
+    }
+  }
+
   // Every stated count of patterns anywhere in the repo, found by pattern
-  // rather than by knowing where the claims live.
+  // rather than by knowing where the claims live. The separator is quantified
+  // so "39  patterns" is caught, but intervening words are deliberately NOT
+  // allowed — "35 credit killing patterns" in the 1.1.0 history entry is a
+  // true statement about an old version, not a claim about the current table.
+  // Claims with intervening words are covered by the set comparison above.
   const actual = numbers.length;
-  const claimRe = /\b(\d+)[ \t‐-―-]patterns?\b/gi;
+  const claimRe = /\b(\d+)[ \t‐-―-]+patterns?\b/gi;
   const sources = [...markdownFiles(), '.claude-plugin/plugin.json', '.claude-plugin/marketplace.json'];
   for (const rel of sources) {
     const src = read(rel);
@@ -860,8 +987,6 @@ check(9, 'Pattern numbering is contiguous and every stated count matches it', ()
 // =============================================================================
 // Check 10 - every vendor section in models.md carries one verification marker
 // =============================================================================
-
-const MODELS_FILE = 'references/models.md';
 
 check(10, 'Every vendor section in models.md carries exactly one verification marker', () => {
   const text = read(MODELS_FILE);
@@ -937,6 +1062,20 @@ check(11, 'Every rule still has the slot it depends on (tests/contracts.json)', 
     const rule = contract.rule || '(unnamed rule)';
     const consequence = contract.consequence || 'The rule now has nowhere to land in the generated prompt.';
     for (const slot of contract.slots || []) {
+      // contracts.json promises that underscore keys are comment space, so a
+      // slot holding only notes is legal and skipped. A malformed slot is
+      // reported, never thrown: one throw here would abort the whole check
+      // and hide every later contract's real failures.
+      if (!slot || typeof slot !== 'object') continue;
+      if (Object.keys(slot).every((k) => k.startsWith('_'))) continue;
+      if (typeof slot.file !== 'string' || typeof slot.section !== 'string' || typeof slot.must_contain !== 'string') {
+        fail(`Malformed slot in tests/contracts.json: ${rule}`, [
+          'file: tests/contracts.json',
+          `slot: ${JSON.stringify(slot)}`,
+          'A slot needs string file, section and must_contain (underscore keys are ignored).',
+        ]);
+        continue;
+      }
       const text = read(slot.file);
       if (text === null) {
         fail(`Rule has lost its slot: ${rule}`, [
@@ -991,20 +1130,19 @@ check(12, 'Template L: every Decompiler task has an output format, every format 
   const sec = section(text, `${'#'.repeat(templateL.level)} ${templateL.fullText}`);
   if (!sec) return;
 
-  const secLines = sec.text.split('\n');
-
-  // Declared tasks: bold-led bullets in the "detect which task" list.
+  // Scan through the fence-aware walker. section() skips fenced rows when it
+  // looks for a marker, so a marker collected from inside a fence here could
+  // never be found there — the two scans have to agree on what is visible.
   const declared = [];
-  for (let i = 0; i < secLines.length; i++) {
-    const m = secLines[i].match(/^\s*[-*]\s+\*\*([^*]+)\*\*/);
-    if (m) declared.push({ name: m[1].trim(), line: sec.startLine + i });
-  }
-
-  // Output formats: standalone bold lines ending in "output format:".
   const formats = [];
-  for (let i = 0; i < secLines.length; i++) {
-    const m = secLines[i].match(/^\*\*(.+?)\s+output format:\*\*\s*$/i);
-    if (m) formats.push({ name: m[1].trim(), marker: secLines[i].trim(), line: sec.startLine + i });
+  for (const { line, index, fenced, isFence } of walkLines(sec.text)) {
+    if (fenced || isFence) continue;
+    // Declared tasks: bold-led bullets in the "detect which task" list.
+    const d = line.match(/^\s*[-*]\s+\*\*([^*]+)\*\*/);
+    if (d) declared.push({ name: d[1].trim(), line: sec.startLine + index });
+    // Output formats: standalone bold lines ending in "output format:".
+    const f = line.match(/^\*\*(.+?)\s+output format:\*\*\s*$/i);
+    if (f) formats.push({ name: f[1].trim(), marker: line.trim(), line: sec.startLine + index });
   }
 
   if (formats.length === 0) {
@@ -1039,11 +1177,34 @@ check(12, 'Template L: every Decompiler task has an output format, every format 
     ]);
   }
 
-  // Every format carries a Safety notes line.
+  // Every format carries a Safety notes line, and every echo of the pasted
+  // original declares itself redacted.
   const SAFETY = 'Safety notes:';
   for (const f of formats) {
     const block = section(text, f.marker);
-    if (!block) continue;
+    if (!block) {
+      fail(`Could not slice the output-format block: ${f.name}`, [
+        `file: ${TEMPLATES_FILE} line ${f.line}`,
+        `marker: ${quote(f.marker)}`,
+        'The Safety notes assertion could not be run for this format, so treat it as',
+        'unverified, not as a pass.',
+      ]);
+      continue;
+    }
+    // An `Original ...:` echo line that does not announce redaction re-emits
+    // the very credentials and live records the safety pass just stripped,
+    // with the Safety notes line asserting they were handled.
+    for (const { line, index } of walkLines(block.text)) {
+      if (!/^Original\b/.test(line.trim())) continue;
+      if (!/redact/i.test(line)) {
+        fail(`Decompiler output format echoes the original without declaring redaction: ${f.name}`, [
+          `file: ${TEMPLATES_FILE} line ${block.startLine + index}`,
+          `  ${quote(line.trim())}`,
+          'Every echo of the pasted prompt must carry the word "redacted", or the format',
+          'reproduces stripped secrets verbatim two lines above the Safety notes line.',
+        ]);
+      }
+    }
     if (!block.text.includes(SAFETY)) {
       fail(`Decompiler output format has no Safety notes line: ${f.name}`, [
         `file: ${TEMPLATES_FILE} line ${f.line}`,
@@ -1052,6 +1213,61 @@ check(12, 'Template L: every Decompiler task has an output format, every format 
         'Consequence: a Decompiler run through this format can strip a leaked API key or a live',
         'customer record and never tell the user it happened.',
       ]);
+    }
+  }
+});
+
+// =============================================================================
+// Check 13 - README's tool-profile table only names tools the skill can route
+// =============================================================================
+
+check(13, "Every tool in README's profile table is reachable through the skill", () => {
+  const readme = read('README.md');
+  const skill = read(SKILL_FILE);
+  const profiles = read(PROFILES_FILE);
+  if (readme === null || skill === null || profiles === null) return; // missing files reported by other checks
+
+  // Locate the profile table by its header shape, not by position.
+  const lines = readme.split('\n');
+  let headerIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t.startsWith('|')) continue;
+    const cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    if (cells.some((c) => /^tool$/i.test(c)) && cells.some((c) => /fixes/i.test(c))) { headerIdx = i; break; }
+  }
+  if (headerIdx === -1) return; // table removed entirely is an editorial choice, not a break
+
+  const table = parseTable(readme, headerIdx);
+  if (!table) return;
+
+  // A README row is routable when each slash-separated name in its Tool cell
+  // (or the name's head before a parenthetical) appears in SKILL.md's Routing
+  // Index section or anywhere in tool-profiles.md, case-insensitively. The
+  // haystack is deliberately lenient: this check exists to catch phantom
+  // tools that exist NOWHERE (the "OpenAI Computer Use" and "SearchGPT" class
+  // of drift), not to police wording.
+  const routingHeading = headings(skill).find((h) => /routing\s+index/i.test(h.text));
+  const routingSec = routingHeading
+    ? section(skill, `${'#'.repeat(routingHeading.level)} ${routingHeading.text}`)
+    : null;
+  const haystack = `${routingSec ? routingSec.text : ''}\n${profiles}`.toLowerCase();
+
+  for (const row of table.body) {
+    const cell = (row.cells[0] || '').replace(/\*\*/g, '').trim();
+    if (cell === '') continue;
+    for (const name of cell.split('/').map((n) => n.trim()).filter(Boolean)) {
+      const head = name.replace(/\s*\(.*$/, '').trim();
+      const hit = haystack.includes(name.toLowerCase()) || (head !== '' && haystack.includes(head.toLowerCase()));
+      if (!hit) {
+        fail(`README advertises a tool the skill cannot route: ${name}`, [
+          `file: README.md line ${row.line}`,
+          `  ${quote(cell)}`,
+          `That name appears in neither the ${SKILL_FILE} Routing Index nor ${PROFILES_FILE}.`,
+          'A user who asks for it by this name falls through to the unknown-tool path instead of',
+          'the profile this table promises. Fix the row, or add routing for the tool.',
+        ]);
+      }
     }
   }
 });
@@ -1106,4 +1322,7 @@ if (failures.length) {
 }
 
 console.log(out.join('\n'));
-process.exit(failed > 0 ? 1 : 0);
+// Set the code and let Node drain stdout naturally. process.exit() terminates
+// before an over-64KB write to a pipe (CI attaches one) has flushed, which
+// truncates exactly the large failure reports that matter most.
+process.exitCode = failed > 0 ? 1 : 0;

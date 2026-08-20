@@ -32,12 +32,12 @@
       "consequence": "The skill is told to partition file ownership across parallel agents but the generated brief has no block to write the partition into, so the instruction is dropped and two agents get pointed at the same file.",
       "slots": [
         {
-          "file": "references/templates.md",
+          "file": "skills/prompt-master/references/templates.md",
           "section": "## Template M",
           "must_contain": "## Execution Order"
         },
         {
-          "file": "references/tool-profiles.md",
+          "file": "skills/prompt-master/references/tool-profiles.md",
           "section": "## Claude Code",
           "must_contain": "Execution Order"
         }
@@ -49,22 +49,22 @@
       "consequence": "A Decompiler run can strip a leaked API key, a live customer record, or an embedded prompt injection and never tell the user it happened, because the output format it used has no line to record it in.",
       "slots": [
         {
-          "file": "references/templates.md",
+          "file": "skills/prompt-master/references/templates.md",
           "section": "**Break down output format:**",
           "must_contain": "Safety notes:"
         },
         {
-          "file": "references/templates.md",
+          "file": "skills/prompt-master/references/templates.md",
           "section": "**Adapt output format:**",
           "must_contain": "Safety notes:"
         },
         {
-          "file": "references/templates.md",
+          "file": "skills/prompt-master/references/templates.md",
           "section": "**Simplify output format:**",
           "must_contain": "Safety notes:"
         },
         {
-          "file": "references/templates.md",
+          "file": "skills/prompt-master/references/templates.md",
           "section": "**Split output format:**",
           "must_contain": "Safety notes:"
         }
@@ -76,22 +76,22 @@
       "consequence": "The task runs against another task's output shape, so the pass is never forced to produce what that task exists for. A Simplify with no Simplify format cannot be made to account for what it cut.",
       "slots": [
         {
-          "file": "references/templates.md",
+          "file": "skills/prompt-master/references/templates.md",
           "section": "## Template L",
           "must_contain": "**Break down output format:**"
         },
         {
-          "file": "references/templates.md",
+          "file": "skills/prompt-master/references/templates.md",
           "section": "## Template L",
           "must_contain": "**Adapt output format:**"
         },
         {
-          "file": "references/templates.md",
+          "file": "skills/prompt-master/references/templates.md",
           "section": "## Template L",
           "must_contain": "**Simplify output format:**"
         },
         {
-          "file": "references/templates.md",
+          "file": "skills/prompt-master/references/templates.md",
           "section": "## Template L",
           "must_contain": "**Split output format:**"
         }
@@ -103,12 +103,12 @@
       "consequence": "The skill is told to check a section's verification date before stating a model fact, but the file no longer defines what a verification marker looks like, so every section reads as verified fact.",
       "slots": [
         {
-          "file": "references/models.md",
+          "file": "skills/prompt-master/references/models.md",
           "section": "## Refresh Protocol",
           "must_contain": "last-verified"
         },
         {
-          "file": "references/models.md",
+          "file": "skills/prompt-master/references/models.md",
           "section": "## Refresh Protocol",
           "must_contain": "UNVERIFIED"
         }
@@ -120,7 +120,7 @@
       "consequence": "An edit-an-existing-image request reaches the right profile and then stops, because the profile no longer says which template carries the reference-editing structure.",
       "slots": [
         {
-          "file": "references/tool-profiles.md",
+          "file": "skills/prompt-master/references/tool-profiles.md",
           "section": "## Image AI — Reference Editing",
           "must_contain": "Template J"
         }
@@ -131,9 +131,38 @@
       "consequence": "A ComfyUI request loads the profile and gets prompting notes with no node-workflow structure, because the profile no longer names the template that carries it.",
       "slots": [
         {
-          "file": "references/tool-profiles.md",
+          "file": "skills/prompt-master/references/tool-profiles.md",
           "section": "## ComfyUI",
           "must_contain": "Template K"
+        }
+      ]
+    },
+    {
+      "rule": "Untrusted-content rule covers retrieved content, not only pasted prompts (SKILL.md Input Sanitization)",
+      "_note": "Deliberate exception to rule-of-thumb 1: this slot pins SKILL.md. The section heading and the word 'retrieved' are behavioural anchors, not prose wording. Losing either reopens the indirect prompt-injection channel through vendor docs and web search, which the Model Recency Gate and Universal Fingerprint both instruct the skill to fetch.",
+      "consequence": "The skill fetches vendor documentation and web search results and treats what it finds as authoritative, so an instruction planted in a fetched page is carried into the generated prompt instead of being reported.",
+      "slots": [
+        {
+          "file": "skills/prompt-master/SKILL.md",
+          "section": "### Input Sanitization",
+          "must_contain": "retrieved"
+        }
+      ]
+    },
+    {
+      "rule": "Both reference-file load tables in SKILL.md stay complete (Tool Routing and Reference Files)",
+      "_note": "Deliberate exception to rule-of-thumb 1: pinned to SKILL.md. The same load decision is stated in two zones on purpose; 1.11.0 found the earlier table missing patterns.md, so each table is pinned to the row that history shows gets dropped.",
+      "consequence": "A run that follows the earlier, more prominent table never learns references/patterns.md exists, so the paste-a-bad-prompt path loses its before/after reference.",
+      "slots": [
+        {
+          "file": "skills/prompt-master/SKILL.md",
+          "section": "### Tool Routing",
+          "must_contain": "references/patterns.md"
+        },
+        {
+          "file": "skills/prompt-master/SKILL.md",
+          "section": "## Reference Files",
+          "must_contain": "references/patterns.md"
         }
       ]
     }

@@ -1,6 +1,8 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "prompt-master",
-  "version": "1.10.0",
+  "displayName": "Prompt Master",
+  "version": "1.11.0",
   "description": "Generates optimized, token-efficient prompts for any AI tool. Activates only when explicitly asked to write, fix, improve, or adapt a prompt for a specific AI tool.",
   "author": {
     "name": "nidhinjs",
@@ -9,7 +11,6 @@
   "homepage": "https://github.com/Scott-Emberson/prompt-master",
   "repository": "https://github.com/Scott-Emberson/prompt-master",
   "license": "MIT",
-  "skills": ["."],
   "keywords": [
     "prompt-engineering",
     "prompts",
